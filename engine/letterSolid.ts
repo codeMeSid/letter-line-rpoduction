@@ -10,8 +10,10 @@ const Y = new THREE.Vector3(0, 1, 0);
 /**
  * Thick-stroke letter built from the single-stroke glyph: a cylinder per segment plus a sphere at every
  * stroke point, merged into one geometry. Upright in the x/z plane, reading +x, facing −y (thickness
- * along y). Normalised: bottom at z = 0, x-extent centred on 0. Cached per (char, height, radius) —
- * callers must NOT dispose it.
+ * along y). The glyph cell keeps its vertical position: z = (1 − v) · height, so the cell bottom (v = 1)
+ * is z = 0 and every letter shares the baseline z = (1 − GLYPH_BASE) · height (descenders reach below
+ * it, strokes extend ±radius past the cell). Only x is normalised: extent centred on 0. Cached per
+ * (char, height, radius) — callers must NOT dispose it.
  */
 export function letterGeometry(ch: string, o: LetterSolidOpts): THREE.BufferGeometry {
   const key = `${ch}|${o.height}|${o.radius}`;
@@ -36,7 +38,7 @@ export function letterGeometry(ch: string, o: LetterSolidOpts): THREE.BufferGeom
   for (const p of parts) p.dispose();
   merged.computeBoundingBox();
   const bb = merged.boundingBox!;
-  merged.translate(-(bb.min.x + bb.max.x) / 2, 0, -bb.min.z);
+  merged.translate(-(bb.min.x + bb.max.x) / 2, 0, 0);
   merged.computeBoundingBox();
   merged.computeBoundingSphere();
   cache.set(key, merged);
