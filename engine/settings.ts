@@ -39,7 +39,7 @@ export const defaultSettings: Settings = {
   defectRate: 0.06,
   idleDemo: true,
   forklift: false,
-  sound: true,
+  sound: false,
   volume: 0.6,
   hudOpen: false,
 };
