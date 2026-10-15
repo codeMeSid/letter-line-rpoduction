@@ -9,7 +9,7 @@ Plan: `docs/plan.md`. Controller-owned file (implementers do not edit it).
 | 1 | Scaffold + kernel + wrapper | complete (1 fix round) | 18c7d44..4b86567 |
 | 2 | Core pure logic | complete (1 fix round) | 1df5281..ca6974d |
 | 3 | Glyphs + surfaces | complete | b703d52..8810fe9 |
-| 4 | Audio bus + synth | pending | |
+| 4 | Audio bus + synth | complete | b12795e..392b05b |
 | 5 | Runtime engine + director + demo factory | pending | |
 | 6 | Bottle factory part 1 (stations 1–7) | pending | |
 | 7 | Bottle factory part 2 (stations 8–13) | pending | |
@@ -83,3 +83,8 @@ Format: `Ruling: <what> — <why> — <cost if wrong>`
 - T3: `O` vs `0` both plain ellipses (.54 vs .46 wide) — may be confusable at 12px; consider slashed/dotted zero.
 - T3: dot ticks (0.06 long) may collapse to a point after rounding on small surfaces (round caps still render).
 - T2: no test pins that 'placing'/'rejected' events survive a callback removing other jobs.
+- T4: loop `stop()` doesn't cancel scheduled gain ramps before fade-out (click risk) — `audio/synth/index.ts`.
+- T4: `/dev/sound` ships in prod build; uses relative imports, not `@/`.
+- T4: `audio/fakeContext.ts` is test-only code in the app tree.
+- T4: `AudioBus.unlock()` calls `provider.init` outside try/catch.
+- T4: loop pan fixed at start; doesn't follow `setListener`.
