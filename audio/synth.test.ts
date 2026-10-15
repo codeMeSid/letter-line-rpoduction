@@ -27,12 +27,21 @@ describe('SynthProvider', () => {
     expect(h.duration).toBeGreaterThan(0);
     expect(h.duration).toBeLessThan(4);
     expect(ctx.sources.length).toBeGreaterThan(0);
-    // every source scheduled to start is also scheduled to stop (nothing runs forever)
-    for (const s of ctx.sources) {
-      expect(s.started.length).toBe(1);
-      expect(s.stopped.length).toBeGreaterThan(0);
+    for (const s of ctx.sources) expect(s.started.length).toBe(1);
+    // loop-as-oneshot calls stop() inside play(); one-shots stay live until halt()
+    const live = ctx.sources.filter((s) => s.stopped.length === 0);
+    if (isLoopName(name)) {
+      expect(live).toHaveLength(0);
+      expect(() => h.stop()).not.toThrow();
+    } else {
+      expect(live.length).toBeGreaterThan(0);
+      expect(() => h.stop()).not.toThrow();
+      for (const s of live) {
+        expect(s.stopped.length).toBe(1);
+        expect(s.disconnected).toBe(true);
+      }
     }
-    expect(() => h.stop()).not.toThrow();
+    expect(ctx.gains.some((g) => g.disconnected)).toBe(true);
   });
 
   it.each(LOOP_NAMES.map((n) => [n]))('loops %s: sources run until stopped, gain is controllable', (name) => {

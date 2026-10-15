@@ -56,15 +56,17 @@ export class Voice {
   readonly out: GainNode;
   readonly t0: number;
   private readonly srcs: AudioScheduledSourceNode[] = [];
-  private readonly owned: AudioNode[] = [];
+  private readonly nodes: AudioNode[] = [];
   private end = 0;
-  private last: AudioScheduledSourceNode | null = null;
+  private halted = false;
+  private timer: OscillatorNode | null = null;
 
   constructor(readonly ctx: AudioContext, dest: AudioNode, gain: number, readonly rate: number) {
     this.t0 = ctx.currentTime + 0.005;
     this.out = ctx.createGain();
     this.out.gain.value = gain;
     this.out.connect(dest);
+    this.nodes.push(this.out);
   }
 
   get duration(): number { return Math.max(0, this.end - this.t0); }
@@ -73,7 +75,7 @@ export class Voice {
   at(s: number): number { return this.t0 + s / this.rate; }
 
   /** nodes the voice should disconnect when it ends (e.g. a panner) */
-  own(n: AudioNode): void { this.owned.push(n); }
+  own(n: AudioNode): void { this.nodes.push(n); }
 
   // ---- raw building blocks -------------------------------------------------
 
@@ -105,6 +107,7 @@ export class Voice {
   gain(value = 1): GainNode {
     const g = this.ctx.createGain();
     g.gain.value = value;
+    this.nodes.push(g);
     return g;
   }
 
@@ -113,6 +116,7 @@ export class Voice {
     b.type = type;
     b.frequency.value = hz * this.rate;
     b.Q.value = q;
+    this.nodes.push(b);
     return b;
   }
 
@@ -150,35 +154,66 @@ export class Voice {
     this.route(this.noiseSrc(s.kind ?? 'white', at, stop), s, at, dur, stop);
   }
 
-  /** Stop everything with a short fade. `when` defaults to now. */
+  /**
+   * Stop everything now. Sources are never pre-scheduled to stop, so this is the first
+   * (and only) `src.stop()` — the voice-cap path can actually halt the graph.
+   */
   stop(fade = 0.04, when = this.ctx.currentTime): void {
-    this.out.gain.setTargetAtTime(0, when, fade / 3);
-    for (const s of this.srcs) {
-      try { s.stop(when + fade); } catch { /* already ended */ }
-    }
-    this.end = Math.max(this.end, when + fade);
-    this.finish();
+    this.halt(when, fade);
   }
 
-  /** Disconnect the voice's graph once its last source has ended. */
+  /**
+   * Arm a silent timer that calls halt() at the voice's natural end. Sources stay
+   * unstopped until halt(), so an early `stop()` can still call `src.stop()` once.
+   */
   finish(): void {
-    const last = this.last ?? this.srcs[0];
-    if (!last) return;
-    last.onended = () => {
-      this.out.disconnect();
-      for (const n of this.owned) n.disconnect();
-    };
+    if (this.halted || this.timer) return;
+    if (this.end <= this.t0) {
+      this.halt(this.t0, 0);
+      return;
+    }
+    const timer = this.ctx.createOscillator();
+    const silent = this.ctx.createGain();
+    silent.gain.value = 0;
+    timer.connect(silent);
+    silent.connect(this.out);
+    timer.start(this.t0);
+    timer.stop(this.end);
+    timer.onended = () => this.halt(this.ctx.currentTime, 0);
+    this.timer = timer;
+    this.nodes.push(timer, silent);
   }
 
   // ---- internals -----------------------------------------------------------
 
+  private halt(when: number, fade: number): void {
+    if (this.halted) return;
+    this.halted = true;
+    if (this.timer) {
+      try { this.timer.stop(when); } catch { /* already ended */ }
+      this.timer = null;
+    }
+    if (fade > 0) this.out.gain.setTargetAtTime(0, when, fade / 3);
+    else this.out.gain.setValueAtTime(0, when);
+    const cut = when + Math.max(0, fade);
+    for (const s of this.srcs) {
+      try { s.stop(cut); } catch { /* already ended */ }
+    }
+    this.end = Math.max(this.end, cut);
+    this.teardown();
+  }
+
+  private teardown(): void {
+    for (const n of this.nodes) {
+      try { n.disconnect(); } catch { /* already disconnected */ }
+    }
+  }
+
   private run(src: AudioScheduledSourceNode, start: number, stop?: number, offset?: number): void {
     if (offset === undefined) src.start(start); else (src as AudioBufferSourceNode).start(start, offset);
-    if (stop !== undefined) {
-      src.stop(stop);
-      if (stop > this.end) { this.end = stop; this.last = src; }
-    }
+    if (stop !== undefined && stop > this.end) this.end = stop;
     this.srcs.push(src);
+    this.nodes.push(src);
   }
 
   private sweep(p: AudioParam, at: number, dur: number, f0: number, f1?: number, via?: Via): void {
@@ -192,6 +227,7 @@ export class Voice {
     b.type = s.type;
     b.Q.value = s.q ?? 0.7;
     this.sweep(b.frequency, at, dur, s.f0, s.f1, s.via);
+    this.nodes.push(b);
     return b;
   }
 
@@ -218,7 +254,7 @@ export class Voice {
       node.connect(a);
       node = a;
     }
-    const g = this.ctx.createGain();
+    const g = this.gain(FLOOR);
     const p = g.gain;
     const peak = s.peak ?? 0.5;
     const atk = Math.min(s.attack ?? 0.002, s.dur * 0.8) / this.rate;

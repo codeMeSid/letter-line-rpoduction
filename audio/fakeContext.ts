@@ -41,7 +41,14 @@ export class FakeSource extends FakeNode {
   stopped: number[] = [];
   onended: (() => void) | null = null;
   start(t = 0, offset?: number) { this.started.push(t); if (offset !== undefined && offset < 0) throw new Error('bad offset'); }
-  stop(t = 0) { this.stopped.push(t); }
+  stop(t = 0) {
+    if (this.stopped.length) {
+      const err = new Error('cannot call stop more than once');
+      err.name = 'InvalidStateError';
+      throw err;
+    }
+    this.stopped.push(t);
+  }
 }
 export class FakeBiquad extends FakeNode {
   type = 'lowpass';

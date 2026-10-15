@@ -140,8 +140,9 @@ export class AudioBus {
   }
 
   /**
-   * Start a loop. Before unlock it is remembered and starts on unlock. Loops do not count toward the voice
-   * cap and keep running while muted (master gain is 0), so un-muting is instant.
+   * Start a loop. Before unlock it is remembered and starts on unlock. Loops do not count toward
+   * the voice cap. Mute (`setEnabled(false)` / volume 0) stops loop sources so they burn no CPU;
+   * un-mute restarts any handle still live.
    */
   loop(name: SoundName, opts: BusPlayOpts = {}): LoopHandle {
     const entry: LoopEntry = {
@@ -176,8 +177,19 @@ export class AudioBus {
   }
 
   private startLoop(e: LoopEntry): void {
-    if (!this.ctx || e.stopped || e.inner) return;
+    if (!this.ctx || e.stopped || e.inner || this.masterGain === 0) return;
     try { e.inner = this.provider.loop(e.name, { ...e.opts, gain: e.gain }); } catch { /* ignore */ }
+  }
+
+  private pauseLoops(): void {
+    for (const e of this.loops) {
+      e.inner?.stop();
+      e.inner = null;
+    }
+  }
+
+  private resumeLoops(): void {
+    for (const e of this.loops) this.startLoop(e);
   }
 
   private stopVoices(): void {
@@ -186,10 +198,13 @@ export class AudioBus {
   }
 
   private applyMaster(): void {
-    if (!this.master || !this.ctx) return;
-    const p = this.master.gain;
-    p.cancelScheduledValues(this.ctx.currentTime);
-    p.setTargetAtTime(this.masterGain, this.ctx.currentTime, 0.02); // smoothed: no zipper noise
+    if (this.master && this.ctx) {
+      const p = this.master.gain;
+      p.cancelScheduledValues(this.ctx.currentTime);
+      p.setTargetAtTime(this.masterGain, this.ctx.currentTime, 0.02); // smoothed: no zipper noise
+    }
+    if (this.masterGain === 0) this.pauseLoops();
+    else this.resumeLoops();
   }
 
   private resolve(o: BusPlayOpts): PlayOpts {

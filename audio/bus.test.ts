@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AudioBus, MAX_VOICES, volumeToGain } from './bus';
 import { FakeAudioContext, asContext } from './fakeContext';
+import { SynthProvider } from './synth';
 import type { AudioProvider, LoopHandle, PlayOpts, SoundName, VoiceHandle } from './types';
 
 class FakeProvider implements AudioProvider {
@@ -143,6 +144,25 @@ describe('AudioBus voice cap', () => {
     expect(provider.handles.slice(1).some((h) => h.stopped)).toBe(false);
   });
 
+  it('SynthProvider cap actually stops the oldest voice sources', () => {
+    const ctx = new FakeAudioContext();
+    const provider = new SynthProvider();
+    let t = 1000;
+    const bus = new AudioBus({
+      provider, createContext: () => asContext(ctx), now: () => t, volume: 1,
+    });
+    bus.unlock();
+    bus.play('factory-bell');
+    const live = ctx.sources.filter((s) => s.stopped.length === 0);
+    expect(live.length).toBeGreaterThan(0);
+    for (let i = 1; i < MAX_VOICES; i++) { t += 41; bus.play('factory-bell'); }
+    expect(live.every((s) => s.stopped.length === 0)).toBe(true);
+    t += 41;
+    bus.play('factory-bell');
+    expect(live.every((s) => s.stopped.length === 1)).toBe(true);
+    expect(live.every((s) => s.disconnected)).toBe(true);
+  });
+
   it('does not stop voices that already ended on their own', () => {
     const { bus, provider, advance } = setup({ durationS: 0.1 });
     bus.unlock();
@@ -186,6 +206,24 @@ describe('AudioBus volume', () => {
     expect(ctx.gains[0].gain.value).toBe(0);
     bus.setEnabled(true);
     expect(ctx.gains[0].gain.value).toBeCloseTo(0.64);
+  });
+
+  it('stops loop sources on mute and restarts them on unmute', () => {
+    const { bus, provider } = setup();
+    bus.unlock();
+    bus.loop('furnace-roar');
+    expect(provider.loops).toHaveLength(1);
+    expect(provider.loops[0].handle.stopped).toBe(false);
+    bus.setEnabled(false);
+    expect(provider.loops[0].handle.stopped).toBe(true);
+    bus.setEnabled(true);
+    expect(provider.loops).toHaveLength(2);
+    expect(provider.loops[1].handle.stopped).toBe(false);
+    bus.setVolume(0);
+    expect(provider.loops[1].handle.stopped).toBe(true);
+    bus.setVolume(0.6);
+    expect(provider.loops).toHaveLength(3);
+    expect(provider.loops[2].handle.stopped).toBe(false);
   });
 
   it('does not play one-shots while disabled or at volume 0', () => {
