@@ -7,7 +7,7 @@ Plan: `docs/plan.md`. Controller-owned file (implementers do not edit it).
 | Task | Title | Status | Commits |
 | --- | --- | --- | --- |
 | 1 | Scaffold + kernel + wrapper | complete (1 fix round) | 18c7d44..4b86567 |
-| 2 | Core pure logic | pending | |
+| 2 | Core pure logic | complete (1 fix round) | 1df5281..ca6974d |
 | 3 | Glyphs + surfaces | pending | |
 | 4 | Audio bus + synth | pending | |
 | 5 | Runtime engine + director + demo factory | pending | |
@@ -56,7 +56,15 @@ Format: `Ruling: <what> — <why> — <cost if wrong>`
 
 - Ruling (T1): Pulled minor finding "accent classes beat kernel .nf/.fo" into fix round 1 — later tasks (neon, flash) combine them — none.
 
+- Ruling (T2): `Shelf.peekLast()` returns `{kind:'busy'}` when a newline would be crossed while the last row still holds dying/debris slots; the director (T8) must keep a pending-backspace count and retry on `slot:removed` — avoids moving animating slots across rows — a swallowed/late backspace if T8 forgets the retry.
+- Ruling (T2): Line phase callbacks are queued and flushed after each tick (callbacks may mutate the Line); `remove()` sets phase `destroyed` and returns the job — director reacts to events synchronously — none.
+- Ruling (T2): share text capped at 2000 chars.
+
 ## Notes for later tasks
+
+- `layoutStations().floors` = list of floor z values (not per-station index).
+- Shelf helpers available: `removeNewline`, `markDying`, `attachJob`, `getSlot`.
+- Line drops a pending event if its job changed phase before flush (only happens for jobs removed by a callback).
 
 - `HL.tset(tw, to, now, delay)` requires `delay` (pass 0); omitting it yields NaN.
 - TypeScript pinned to 5.9 (Next 15 needs the JS compiler API).
@@ -65,3 +73,9 @@ Format: `Ruling: <what> — <why> — <cost if wrong>`
 
 - T1: `@types/node ^26` vs Node 25 runtime (harmless).
 - T1: `jsdom` installed but unused so far.
+- T2: `Line.relayout` rescales conveyor distance by progress; shortened segments can leave jobs closer than MIN_GAP until head moves.
+- T2: `Line` constructor throws on zero stations while `layoutStations` accepts empty list.
+- T2: `lib/share.ts` imports `defaultSettings` from the zustand store module (pulls zustand into codec).
+- T2: `events.ts` one throwing handler aborts delivery to later listeners.
+- T2: stacked/all layout return/lift paths at y=-80 can cross footprints deeper than 160.
+- T2: no test pins that 'placing'/'rejected' events survive a callback removing other jobs.
