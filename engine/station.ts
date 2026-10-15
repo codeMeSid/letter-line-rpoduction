@@ -1,15 +1,13 @@
 import type { Job, Vec3 } from './types';
 import type { Settings } from './settings';
 import type { AudioBus } from '../audio/bus';
-
-// Minimal placeholder until engine/particles.ts exists (a later task narrows this).
-export interface ParticleSystemLike { emit(kind: string, opts: unknown): void }
+import type { ParticleSystem } from './particles';
 
 export interface StationCtx {
   P: (x: number, y: number, z: number) => [number, number];
   layer: SVGGElement;          // this station's own group, already positioned in paint order
   origin: Vec3;                // station anchor in world coords (station draws relative to it)
-  particles: ParticleSystemLike;
+  particles: ParticleSystem;   // engine/particles.ts
   audio: AudioBus;             // audio/bus.ts
   settings: () => Settings;
   now: () => number;           // ms
