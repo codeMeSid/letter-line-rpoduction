@@ -11,6 +11,11 @@ export interface Slot {
 }
 
 export interface NewlineMarker { kind: 'newline' }
+/**
+ * The target is behind slots still being destroyed (dying/debris) in the last row after a newline;
+ * the caller should retry after the next slot removal.
+ */
+export interface BusyMarker { kind: 'busy' }
 
 /**
  * Typewriter shelf model (pure). Rows of up to `cols` slots; a row either wraps automatically
@@ -65,17 +70,20 @@ export class Shelf {
   }
 
   /**
-   * Last slot that is not already being destroyed (state `dying`/`debris`), or a newline marker when
-   * the walk back reaches a newline-closed row boundary first, or null when the shelf is empty.
+   * Backspace target: the last slot not already being destroyed (state `dying`/`debris`);
+   * `{kind:'newline'}` when the last row is truly empty and the previous row was closed by a newline;
+   * `{kind:'busy'}` when a newline-started row still holds only dying/debris slots (a newline is never
+   * crossed while destroyed slots remain; retry after the next slot removal); null when nothing is left.
+   * Auto-wrap boundaries are crossed silently.
    */
-  peekLast(): Slot | NewlineMarker | null {
+  peekLast(): Slot | NewlineMarker | BusyMarker | null {
     for (let r = this.rows.length - 1; r >= 0; r--) {
       const row = this.rows[r];
       for (let c = row.length - 1; c >= 0; c--) {
         const s = row[c];
         if (s.state !== 'dying' && s.state !== 'debris') return s;
       }
-      if (r > 0 && this.endedByNewline[r - 1]) return { kind: 'newline' };
+      if (r > 0 && this.endedByNewline[r - 1]) return row.length > 0 ? { kind: 'busy' } : { kind: 'newline' };
     }
     return null;
   }

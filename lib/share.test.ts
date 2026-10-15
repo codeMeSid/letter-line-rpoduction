@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeShare, encodeShare } from './share';
+import { decodeShare, encodeShare, MAX_SHARE_TEXT } from './share';
 import { defaultSettings } from '../engine/settings';
 
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64url');
@@ -64,6 +64,21 @@ describe('share codec', () => {
     ];
     for (const input of bad) expect(() => decodeShare(input), input).not.toThrow();
     for (const input of bad) expect(decodeShare(input), input).toBeNull();
+  });
+
+  it('rejects inherited Object.prototype names as setting keys', () => {
+    for (const json of ['{"toString":1}', '{"constructor":{}}', '{"__proto__":{}}', '{"valueOf":true}', '{"hasOwnProperty":1}']) {
+      expect(decodeShare(`p=can&s=${b64(json)}`), json).toBeNull();
+    }
+  });
+
+  it('truncates decoded text to 2000 characters', () => {
+    const long = 'a'.repeat(2500);
+    const out = decodeShare(encodeShare({ product: 'can', text: long, settings: {} }));
+    expect(MAX_SHARE_TEXT).toBe(2000);
+    expect(out?.text).toHaveLength(2000);
+    const exact = 'b\n'.repeat(1000);
+    expect(decodeShare(encodeShare({ product: 'can', text: exact, settings: {} }))?.text).toBe(exact);
   });
 
   it('is deterministic', () => {

@@ -8,6 +8,9 @@ export interface SharePayload {
   settings: Partial<Settings>;
 }
 
+/** Decoded share text is truncated to this many characters. */
+export const MAX_SHARE_TEXT = 2000;
+
 // ---- base64url (hand-rolled so this stays DOM/Node-API free) ----
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
@@ -114,7 +117,7 @@ export function decodeShare(search: string): SharePayload | null {
     if (t) {
       const decoded = decodeText(t);
       if (decoded === null || ![...decoded].every(isShareChar)) return null;
-      text = decoded;
+      text = decoded.slice(0, MAX_SHARE_TEXT);
     }
 
     const settings: Partial<Settings> = {};
@@ -126,7 +129,7 @@ export function decodeShare(search: string): SharePayload | null {
       if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
       const target = settings as Record<string, unknown>;
       for (const [k, v] of Object.entries(raw)) {
-        if (!(k in validators)) return null;
+        if (!Object.hasOwn(validators, k)) return null;
         if (!validators[k as keyof Validators](v)) return null;
         target[k] = v;
       }

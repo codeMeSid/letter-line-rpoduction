@@ -59,9 +59,9 @@ Import app code with the `@/` alias (maps to repo root).
   `dynamic(..., { ssr:false })` → Scene), `globals.css` (full-viewport override, accent vars + `acc-*` classes)
 - `engine/` — pure & unit-tested (no DOM): `types`, `charset`, `settings` (zustand store + `useSettings`), `clock` (WPM/speedMul),
   `events` (typed emitter), `layout` (`layoutStations`: anchors/paths per mode, footprints centred on anchors),
-  `line` (`Line` pipeline; `decide` injected; jobs leave as `placing`/`rejected`), `input` (`keyToCommand`),
+  `line` (`Line` pipeline; `decide` injected; jobs leave as `placing`/`rejected`; phase callbacks flush after each tick; `remove()` → `destroyed`), `input` (`keyToCommand`),
   `station` (StationDef/Instance/Ctx types, placeholder particle/audio interfaces). Later: director, camera, loop, particles
-- `shelf/` — `model.ts` pure `Shelf` (lazy auto-wrap at 14, per-row `endedByNewline`, `removeNewline`) + view later
+- `shelf/` — `model.ts` pure `Shelf` (lazy auto-wrap at 14, per-row `endedByNewline`, `removeNewline`; `peekLast` → slot | newline | busy | null) + view later
 - `audio/` — bus, synth provider, sample provider stub
 - `factories/` — one folder per product + `shared/` parts and robot arm
 - `fx/` — shotgun, chute, broom, forklift, workers, day/night

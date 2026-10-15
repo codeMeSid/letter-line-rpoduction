@@ -116,16 +116,29 @@ describe('Shelf', () => {
     expect(s.peekLast()).toBeNull();
   });
 
-  it('peekLast skips destroyed slots across rows and reports a newline if one is crossed', () => {
+  it("peekLast is 'busy' (not 'newline') while a newline-started row holds only dying/debris slots", () => {
     const s = new Shelf();
     const [a] = type(s, 'a');
     s.newline();
     const [b] = type(s, 'b');
     s.markDying(b.slotId);
-    expect(s.peekLast()).toEqual({ kind: 'newline' });
+    expect(s.peekLast()).toEqual({ kind: 'busy' });
+    expect(s.removeNewline()).toBe(false);
     s.remove(b.slotId);
-    s.removeNewline();
+    expect(s.peekLast()).toEqual({ kind: 'newline' });
+    expect(s.removeNewline()).toBe(true);
     expect(s.peekLast()).toMatchObject({ id: a.slotId });
+  });
+
+  it("peekLast is 'busy' for debris-only rows and still prefers a live slot in the same row", () => {
+    const s = new Shelf();
+    type(s, 'a');
+    s.newline();
+    const [b, c] = type(s, 'bc');
+    s.markDebris(c.slotId);
+    expect(s.peekLast()).toMatchObject({ id: b.slotId });
+    s.markDebris(b.slotId);
+    expect(s.peekLast()).toEqual({ kind: 'busy' });
   });
 
   it('peekLast crosses an auto-wrap boundary silently', () => {

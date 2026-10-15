@@ -48,6 +48,7 @@ export class Line {
   private segs: Job[][];         // segs[i]: jobs on conveyor i, head (furthest ahead) first
   private tracks = new Map<number, Track>();
   private callbacks = new Set<PhaseCb>();
+  private pending: { job: Job; prev: JobPhase; phase: JobPhase }[] = [];
 
   constructor(
     private stations: StationDef[],
@@ -79,12 +80,16 @@ export class Line {
     this.tracks.set(job.id, { dist: 0, elapsed: 0, decided: false });
   }
 
-  /** Remove a job from anywhere in the line. Returns false if it is not in the line. No callback fires. */
-  remove(jobId: number): boolean {
-    const idx = this.jobs.findIndex((j) => j.id === jobId);
-    if (idx < 0) return false;
-    this.detach(this.jobs[idx]);
-    return true;
+  /**
+   * Remove a job from anywhere in the line: sets its phase to 'destroyed' and returns it, or null if
+   * it is not in the line. No phase callback fires; events still pending for it are dropped.
+   */
+  remove(jobId: number): Job | null {
+    const job = this.jobs.find((j) => j.id === jobId);
+    if (!job) return null;
+    this.detach(job);
+    job.phase = 'destroyed';
+    return job;
   }
 
   /** Swap in a new geometry; in-flight jobs keep stationIndex/progress and get new positions. */
@@ -108,6 +113,7 @@ export class Line {
       else this.intake();
     }
     for (const job of this.jobs) if (job.phase === 'conveyor') this.updatePos(job);
+    this.flush();
   }
 
   // ---- internals ----
@@ -120,8 +126,19 @@ export class Line {
     this.polys = paths.map(toPoly);
   }
 
+  /** Phase events are queued during tick() and delivered after all mutation passes complete. */
   private emit(job: Job, prev: JobPhase): void {
-    for (const cb of [...this.callbacks]) cb(job, prev);
+    this.pending.push({ job, prev, phase: job.phase });
+  }
+
+  /** Deliver queued events; callbacks may call remove()/enqueue(). Stale events (job changed since) are skipped. */
+  private flush(): void {
+    const events = this.pending;
+    this.pending = [];
+    for (const e of events) {
+      if (e.job.phase !== e.phase) continue;
+      for (const cb of [...this.callbacks]) cb(e.job, e.prev);
+    }
   }
 
   private durationOf(i: number, job: Job): number {

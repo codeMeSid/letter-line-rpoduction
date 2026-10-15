@@ -199,30 +199,33 @@ describe('Line', () => {
     run(line, 1);
     expect(a.phase).toBe('station');
     expect(b.phase).toBe('queued');
-    expect(line.remove(a.id)).toBe(true);
+    expect(line.remove(a.id)).toBe(a);
+    expect(a.phase).toBe('destroyed');
     expect(line.jobs).toEqual([b]);
     line.tick(0.05);
     expect(b.phase).toBe('station');
     expect(b.stationIndex).toBe(0);
   });
 
-  it('remove() works for queued jobs and jobs on a conveyor; unknown ids return false', () => {
+  it('remove() works for queued jobs and jobs on a conveyor; unknown ids return null; removed jobs become destroyed', () => {
     const { line } = build([mkStation('a', 0.1), mkStation('b', 50)]);
     const [a, b, c] = [mkJob(), mkJob(), mkJob()];
     [a, b, c].forEach((j) => line.enqueue(j));
     run(line, 4);
     expect(a.phase).toBe('station'); // a reached station 1 (long)
     expect(b.phase).toBe('conveyor');
-    expect(line.remove(b.id)).toBe(true);
-    expect(line.remove(b.id)).toBe(false);
-    expect(line.remove(9999)).toBe(false);
+    expect(line.remove(b.id)).toBe(b);
+    expect(b.phase).toBe('destroyed');
+    expect(line.remove(b.id)).toBeNull();
+    expect(line.remove(9999)).toBeNull();
     expect(line.jobs.map((j) => j.id)).toEqual([a.id, c.id]);
     run(line, 3);
     expect(c.phase).toBe('conveyor'); // not stuck behind removed job
-    expect(line.remove(c.id)).toBe(true);
+    expect(line.remove(c.id)).toBe(c);
     const d = mkJob();
     line.enqueue(d);
-    expect(line.remove(d.id)).toBe(true);
+    expect(line.remove(d.id)).toBe(d);
+    expect(d.phase).toBe('destroyed');
     expect(line.jobs.map((j) => j.id)).toEqual([a.id]);
   });
 
@@ -258,6 +261,38 @@ describe('Line', () => {
     expect(b.pos[0]).toBeCloseTo(wide.anchors[0][0] + len * progress, 6);
     run(line, 0.5);
     expect(b.pos[0]).toBeGreaterThan(wide.anchors[0][0] + len * progress);
+  });
+
+  it('delivers phase callbacks after the tick; callbacks may remove() and enqueue() safely', () => {
+    const { line } = build([mkStation('a', 1), mkStation('b', 1)]);
+    const [a, b] = [mkJob(), mkJob()];
+    const c = mkJob();
+    const seen: string[] = [];
+    let jobsDuringTick: number[] = [];
+    line.onPhase((j, prev) => {
+      seen.push(`${j.id}:${prev}>${j.phase}`);
+      if (j.id === a.id && j.phase === 'conveyor') {
+        jobsDuringTick = line.jobs.map((x) => x.id);
+        expect(line.remove(b.id)).toBe(b);
+        line.enqueue(c);
+      }
+    });
+    line.enqueue(a);
+    line.enqueue(b);
+    // dt 0.5: a enters tick 1, leaves station 0 on tick 3 -- the same tick b enters station 0
+    for (let i = 0; i < 3; i++) line.tick(0.5);
+    expect(jobsDuringTick).toEqual([a.id, b.id]); // callback saw a fully consistent line
+    expect(b.phase).toBe('destroyed');
+    expect(seen).not.toContain(`${b.id}:queued>station`); // stale event for the removed job is dropped
+    expect(line.jobs.map((j) => j.id)).toEqual([a.id, c.id]);
+    expect(c.phase).toBe('queued');
+    run(line, 30);
+    expect(a.phase).toBe('placing');
+    expect(c.phase).toBe('placing');
+    expect(line.jobs).toHaveLength(0);
+    expect(seen.filter((e) => e.startsWith(`${c.id}:`))).toEqual([
+      `${c.id}:queued>station`, `${c.id}:station>conveyor`, `${c.id}:conveyor>station`, `${c.id}:station>placing`,
+    ]);
   });
 
   it('relayout rejects mismatched geometry', () => {
