@@ -33,6 +33,9 @@ brick), procedural sound, collapsible HUD.
 - `pnpm test` — `vitest run`
 - `pnpm build` — `next build`
 All three of typecheck/test/build must pass before every commit.
+Tooling: pnpm, Node 25, Next 15.5 + React 19, TypeScript 5.9 (pinned `typescript@5`; Next 15 needs the JS
+compiler API), vitest 5 (node env; `vitest.config.ts` loads as ESM via `"type": "module"`).
+Import app code with the `@/` alias (maps to repo root).
 
 ## Non-negotiable conventions (full list: Global Constraints in `docs/plan.md`)
 
@@ -49,11 +52,15 @@ All three of typecheck/test/build must pass before every commit.
 
 ## Architecture (fills in as tasks land)
 
-- `lib/` — kernel wrapper, share codec
+- `lib/` — `hl.ts` typed kernel wrapper (`hl()` → `window.HL`; `tset` needs an explicit delay arg, 0 for none),
+  `hl.node.ts` (`loadHL()` for tests), share codec later. `lib/hl.test.ts` pins the kernel file's sha256 —
+  update the constant only if the kernel is deliberately re-vendored.
+- `app/` — `layout.tsx` (loads kernel via `next/script` beforeInteractive), `page.tsx` (client component,
+  `dynamic(..., { ssr:false })` → Scene), `globals.css` (full-viewport override, accent vars + `acc-*` classes)
 - `engine/` — types, settings store, clock, line pipeline, layout, input, director, camera, loop, particles
 - `shelf/` — shelf model (pure) + view
 - `audio/` — bus, synth provider, sample provider stub
 - `factories/` — one folder per product + `shared/` parts and robot arm
 - `fx/` — shotgun, chute, broom, forklift, workers, day/night
 - `hud/` — React HUD + gauges
-- `components/Scene.tsx` — client entry mounting everything
+- `components/Scene.tsx` — client entry mounting everything (Task 1: placeholder single prism)

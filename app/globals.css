@@ -1,0 +1,75 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #08090a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+/* Accent palette (Global Constraint 6). */
+:root {
+  --acc-molten: #ff7a1a;
+  --acc-drink: #3a1a0e;
+  --acc-neon: #ff3df0;
+  --acc-flash: #fff4c2;
+  --acc-glass: #9fd8c8;
+  --acc-label: #d92b2b;
+}
+
+/* The world fills the viewport; overrides the kernel's 5/4 aspect-ratio. */
+[data-hairline] {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  aspect-ratio: auto;
+  touch-action: none;
+}
+
+/*
+ * Accent classes colour stroke/fill only under data-color="accent".
+ * Under data-color="mono" they fall back to the hi stroke with no fill colour.
+ * Selectors outweigh the kernel's :where() rules without needing !important.
+ */
+[data-hairline] svg .acc-molten,
+[data-hairline] svg .acc-drink,
+[data-hairline] svg .acc-neon,
+[data-hairline] svg .acc-flash,
+[data-hairline] svg .acc-glass,
+[data-hairline] svg .acc-label {
+  stroke: var(--hl-hi);
+}
+
+[data-hairline][data-color='accent'] svg .acc-molten {
+  stroke: var(--acc-molten);
+  fill: var(--acc-molten);
+}
+[data-hairline][data-color='accent'] svg .acc-drink {
+  stroke: var(--acc-drink);
+  fill: var(--acc-drink);
+}
+[data-hairline][data-color='accent'] svg .acc-neon {
+  stroke: var(--acc-neon);
+  fill: var(--acc-neon);
+}
+[data-hairline][data-color='accent'] svg .acc-flash {
+  stroke: var(--acc-flash);
+  fill: var(--acc-flash);
+}
+[data-hairline][data-color='accent'] svg .acc-glass {
+  stroke: var(--acc-glass);
+  fill: var(--acc-glass);
+}
+[data-hairline][data-color='accent'] svg .acc-label {
+  stroke: var(--acc-label);
+  fill: var(--acc-label);
+}
