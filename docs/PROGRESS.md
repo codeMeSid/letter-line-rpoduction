@@ -8,7 +8,7 @@ Plan: `docs/plan.md`. Controller-owned file (implementers do not edit it).
 | --- | --- | --- | --- |
 | 1 | Scaffold + kernel + wrapper | complete (1 fix round) | 18c7d44..4b86567 |
 | 2 | Core pure logic | complete (1 fix round) | 1df5281..ca6974d |
-| 3 | Glyphs + surfaces | pending | |
+| 3 | Glyphs + surfaces | complete | b703d52..8810fe9 |
 | 4 | Audio bus + synth | pending | |
 | 5 | Runtime engine + director + demo factory | pending | |
 | 6 | Bottle factory part 1 (stations 1–7) | pending | |
@@ -64,6 +64,8 @@ Format: `Ruling: <what> — <why> — <cost if wrong>`
 
 - `layoutStations().floors` = list of floor z values (not per-station index).
 - Shelf helpers available: `removeNewline`, `markDying`, `attachJob`, `getSlot`.
+- Glyph cell: u 0..0.7, caps/digits occupy v 0..0.8 (baseline 0.8, descenders to 1). Pass `offset:[0,0.1]` to centre caps. `flatSurface` never culls (caller orients). `topSurface` fits a 0.7:1 rect in the disc; use `scale<1` for margin. Cylinder glyph aspect depends on arc/radius/height (default arc π/2).
+- vitest has no `@/` alias; tests import by relative path.
 - Line drops a pending event if its job changed phase before flush (only happens for jobs removed by a callback).
 
 - `HL.tset(tw, to, now, delay)` requires `delay` (pass 0); omitting it yields NaN.
@@ -78,4 +80,6 @@ Format: `Ruling: <what> — <why> — <cost if wrong>`
 - T2: `lib/share.ts` imports `defaultSettings` from the zustand store module (pulls zustand into codec).
 - T2: `events.ts` one throwing handler aborts delivery to later listeners.
 - T2: stacked/all layout return/lift paths at y=-80 can cross footprints deeper than 160.
+- T3: `O` vs `0` both plain ellipses (.54 vs .46 wide) — may be confusable at 12px; consider slashed/dotted zero.
+- T3: dot ticks (0.06 long) may collapse to a point after rounding on small surfaces (round caps still render).
 - T2: no test pins that 'placing'/'rejected' events survive a callback removing other jobs.
