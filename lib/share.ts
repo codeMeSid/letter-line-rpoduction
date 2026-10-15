@@ -67,6 +67,9 @@ const isMarks = (v: unknown): v is LetterMarks => {
 
 type Validators = { [K in Exclude<keyof Settings, 'product'>]: (v: unknown) => v is Settings[K] };
 const validators: Validators = {
+  look: oneOf('realistic', 'lineart', 'flat', 'cutaway'),
+  pace: oneOf('auto', 'fast', 'detailed', 'cinematic'),
+  quality: oneOf('low', 'high'),
   layout: oneOf('snake', 'pan', 'stacked', 'all'),
   letterMarks: isMarks,
   colorMode: oneOf('accent', 'mono'),

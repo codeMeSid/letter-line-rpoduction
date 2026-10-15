@@ -55,7 +55,7 @@ describe('layoutStations', () => {
     expect(b).toEqual(a);
   });
 
-  it.each(MODES)('%s: bounds contain anchors/paths; shelf is in front of the line', (mode) => {
+  it.each(MODES)('%s: bounds contain anchors/paths; shelf is in front of the line (−y)', (mode) => {
     const r = layoutStations(mkDefs(12), mode, origin);
     for (const pt of [...r.anchors, ...r.paths.flat()]) {
       for (let a = 0; a < 3; a++) {
@@ -63,7 +63,7 @@ describe('layoutStations', () => {
         expect(pt[a]).toBeLessThanOrEqual(r.bounds.max[a]);
       }
     }
-    expect(r.shelfOrigin).toEqual([r.bounds.min[0], r.bounds.max[1] + 160, 0]);
+    expect(r.shelfOrigin).toEqual([r.bounds.min[0], r.bounds.min[1] - 160, 0]);
     expect(r.shelfAxis).toEqual([1, 0, 0]);
   });
 
@@ -78,11 +78,11 @@ describe('layoutStations', () => {
     expect(r.floors).toEqual([0]);
   });
 
-  it('snake: rows of 5 alternating direction, stacked along +y, U-turn at row end', () => {
+  it('snake: rows of 5 alternating direction, stacked along −y, U-turn at row end', () => {
     const defs = mkDefs(12);
     const r = layoutStations(defs, 'snake', [0, 0, 0]);
     const pitch = Math.max(...defs.map((d) => d.footprint[1])) + 120;
-    r.anchors.forEach((a, i) => expect(a[1]).toBe(Math.floor(i / PER_ROW) * pitch));
+    r.anchors.forEach((a, i) => expect(a[1]).toBe(0 - Math.floor(i / PER_ROW) * pitch));
     expect(r.anchors[1][0]).toBeGreaterThan(r.anchors[0][0]);
     expect(r.anchors[6][0]).toBeLessThan(r.anchors[5][0]);
     expect(r.anchors[5][0]).toBe(r.anchors[4][0]); // turn happens in the same column
@@ -94,7 +94,7 @@ describe('layoutStations', () => {
     expect(r.floors).toEqual([0]);
   });
 
-  it('stacked: floors of 5 at z=140*floor, lift + return conveyor at y=-80', () => {
+  it('stacked: floors of 5 at z=140*floor, lift + return conveyor at y=+80 (behind)', () => {
     const r = layoutStations(mkDefs(11), 'stacked', [0, 0, 0]);
     r.anchors.forEach((a, i) => {
       expect(a[2]).toBe(Math.floor(i / 5) * FLOOR_STEP);
@@ -113,7 +113,7 @@ describe('layoutStations', () => {
     expect(r.anchors[9][2]).toBe(0);
     expect(r.anchors[10][2]).toBe(140);
     expect(r.anchors[20][2]).toBe(280);
-    expect(r.anchors[5][1]).toBeGreaterThan(r.anchors[0][1]);
+    expect(r.anchors[5][1]).toBeLessThan(r.anchors[0][1]);
     expect(r.anchors[10][1]).toBe(r.anchors[0][1]);
     expect(r.anchors[9][0]).toBe(r.anchors[0][0]); // floor ends where the next begins (same column)
     expect(r.floors).toEqual([0, 140, 280]);

@@ -12,7 +12,7 @@ describe('share codec', () => {
   });
 
   it('round-trips every product and empty text', () => {
-    for (const product of ['bottle', 'can', 'mug', 'cookie', 'neon', 'brick'] as const) {
+    for (const product of ['letter', 'bottle', 'can', 'mug', 'cookie', 'neon', 'brick'] as const) {
       expect(decodeShare(encodeShare({ product, text: '', settings: {} }))).toEqual({ product, text: '', settings: {} });
     }
   });
@@ -84,5 +84,11 @@ describe('share codec', () => {
   it('is deterministic', () => {
     const a = encodeShare({ product: 'cookie', text: 'ab\ncd', settings: { camera: 'follow', layout: 'all' } });
     expect(encodeShare({ product: 'cookie', text: 'ab\ncd', settings: { camera: 'follow', layout: 'all' } })).toBe(a);
+  });
+
+  it('round-trips look / pace / quality and rejects an invalid look', () => {
+    const settings = { look: 'cutaway', pace: 'cinematic', quality: 'low' } as const;
+    expect(decodeShare(encodeShare({ product: 'letter', text: 'a', settings }))).toEqual({ product: 'letter', text: 'a', settings });
+    expect(decodeShare(`p=letter&s=${b64('{"look":"neon"}')}`)).toBeNull();
   });
 });

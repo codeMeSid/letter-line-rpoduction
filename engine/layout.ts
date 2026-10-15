@@ -4,7 +4,7 @@ export const GAP = 60;
 export const PER_ROW = 5;
 export const ROW_EXTRA = 120;
 export const FLOOR_STEP = 140;
-export const RETURN_Y = -80;
+export const RETURN_Y = 80;
 export const SHELF_FRONT = 160;
 
 export interface LayoutDef { footprint: [number, number]; height: number }
@@ -61,7 +61,7 @@ export function layoutStations(defs: LayoutDef[], mode: LayoutMode, origin: Vec3
   const rowPitch = defs.reduce((m, d) => Math.max(m, d.footprint[1]), 0) + ROW_EXTRA;
 
   const [ox, oy, oz] = origin;
-  const anchors: Vec3[] = cells.map((c) => [ox + colX[c.col], oy + c.row * rowPitch, oz + c.floor * FLOOR_STEP]);
+  const anchors: Vec3[] = cells.map((c) => [ox + colX[c.col], oy - c.row * rowPitch, oz + c.floor * FLOOR_STEP]);
 
   const xRight = ox + colX[maxCol] + colW[maxCol] / 2 + GAP / 2;
   const xLeft = ox + colX[0] - colW[0] / 2 - GAP / 2;
@@ -80,7 +80,7 @@ export function layoutStations(defs: LayoutDef[], mode: LayoutMode, origin: Vec3
       const xt = ca.row % 2 === 0 ? xRight : xLeft;
       paths.push([a, [xt, a[1], a[2]], [xt, b[1], a[2]], b]);
     } else if (mode === 'stacked') {
-      // lift at the right end, return conveyor at y = -80 back to the x start
+      // lift at the right end, return conveyor at y = +80 (behind the line) back to the x start
       paths.push([a, [xRight, a[1], a[2]], [xRight, a[1], b[2]], [xRight, returnY, b[2]], [b[0], returnY, b[2]], b]);
     } else {
       // 'all': floor ends on the left end of its second row; lift there, then cross to row 0
@@ -114,7 +114,7 @@ export function layoutStations(defs: LayoutDef[], mode: LayoutMode, origin: Vec3
     paths,
     floors,
     bounds: { min, max },
-    shelfOrigin: [min[0], max[1] + SHELF_FRONT, 0],
+    shelfOrigin: [min[0], min[1] - SHELF_FRONT, 0],
     shelfAxis: [1, 0, 0],
   };
 }

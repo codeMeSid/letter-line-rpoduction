@@ -238,7 +238,7 @@ describe('Line', () => {
     run(line, 8); // a sits in station 2
     expect(a.stationIndex).toBe(2);
     line.enqueue(b);
-    run(line, 1.75); // b ~halfway along conveyor 0 (len 120)
+    run(line, 0.9); // b ~halfway along conveyor 0 (len 120 at CONVEYOR_SPEED 80)
     expect(b.phase).toBe('conveyor');
     const progress = b.progress;
     expect(progress).toBeGreaterThan(0.2);
@@ -309,5 +309,32 @@ describe('Line', () => {
     line.tick(-1);
     line.tick(NaN);
     expect(job.phase).toBe('queued' as JobPhase);
+  });
+});
+
+describe('Line options', () => {
+  const st = (id: string, duration = 0.5): StationDef => ({ id, label: id, footprint: [40, 40], height: 20, duration, create: () => { throw new Error('unused'); } });
+  const mk = (id: number): Job => ({ id, slotId: id, char: 'a', isSpace: false, special: 'none', product: 'letter', stage: 's', phase: 'queued', stationIndex: -1, progress: 0, pos: [0, 0, 0], defect: false, retries: 0 });
+
+  it('maxInFlight = 1 keeps later jobs queued until the first leaves', () => {
+    const line = new Line([st('a'), st('b')], [[0, 0, 0], [100, 0, 0]], [[[0, 0, 0], [100, 0, 0]]]);
+    line.maxInFlight = 1;
+    let left = 0;
+    line.onPhase((j) => { if (j.phase === 'placing') left++; });
+    for (let i = 1; i <= 3; i++) line.enqueue(mk(i));
+    for (let k = 0; k < 4000 && left < 3; k++) {
+      line.tick(0.01);
+      expect(line.jobs.filter((j) => j.phase !== 'queued').length).toBeLessThanOrEqual(1);
+    }
+    expect(left).toBe(3);
+  });
+
+  it('minGap option overrides MIN_GAP on conveyors', () => {
+    const line = new Line([st('a', 0), st('b', 100)], [[0, 0, 0], [400, 0, 0]], [[[0, 0, 0], [400, 0, 0]]], () => 'pass', { minGap: 50 });
+    for (let i = 1; i <= 4; i++) line.enqueue(mk(i));
+    for (let k = 0; k < 3000; k++) line.tick(0.01);
+    const xs = line.jobs.filter((j) => j.phase === 'conveyor').map((j) => j.pos[0]).sort((a, b) => b - a);
+    expect(xs.length).toBeGreaterThanOrEqual(2);
+    for (let i = 1; i < xs.length; i++) expect(xs[i - 1] - xs[i]).toBeGreaterThanOrEqual(50 - 1e-9);
   });
 });

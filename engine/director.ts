@@ -1,6 +1,7 @@
 import { Clock } from './clock';
 import { createEmitter, type Emitter } from './events';
 import { specialFor } from './charset';
+import { paceParams } from './pace';
 import type { Line } from './line';
 import type { Settings } from './settings';
 import type { Command, Job, JobPhase, ProductKind, SlotRef, Vec3 } from './types';
@@ -88,7 +89,8 @@ export class Director {
   }
 
   speedMul(now: number): number {
-    return this.clock.speedMul(now);
+    const p = paceParams(this.o.settings().pace);
+    return p.wpm ? this.clock.speedMul(now) : p.speedMul;
   }
 
   handle(cmd: Command): void {
@@ -109,6 +111,8 @@ export class Director {
 
   /** Advance every line and the placement arcs. Returns true while anything is in flight. */
   update(simDt: number): boolean {
+    const maxInFlight = paceParams(this.o.settings().pace).maxInFlight;
+    for (const h of this.hosts.values()) h.line.maxInFlight = maxInFlight;
     for (const h of this.hosts.values()) h.line.tick(simDt);
     for (const p of [...this.placing.values()]) {
       p.t = Math.min(1, p.t + simDt / PLACE_TIME);

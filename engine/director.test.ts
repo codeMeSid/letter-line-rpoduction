@@ -12,7 +12,7 @@ const station = (id: string, duration: number): StationDef => ({
 });
 
 function setup(over: Partial<Settings> = {}) {
-  const settings: Settings = { ...defaultSettings, ...over };
+  const settings: Settings = { ...defaultSettings, product: 'bottle', ...over };
   const sounds: string[] = [];
   let now = 0;
   const d = new Director({ settings: () => settings, now: () => now, audio: { play: (n) => { sounds.push(n); } } });
@@ -185,5 +185,29 @@ describe('Director routing', () => {
     expect(d.speedMul(0)).toBe(1);
     typeStr('abcdefghij');
     expect(d.speedMul(0)).toBeGreaterThan(1);
+  });
+});
+
+describe('Director pace', () => {
+  const st: StationDef = { id: 'a', label: 'a', footprint: [40, 40], height: 10, duration: 1, create: () => { throw new Error('unused'); } };
+  it('speedMul follows pace', () => {
+    const s: Settings = { ...defaultSettings, pace: 'fast' };
+    const d = new Director({ settings: () => s, now: () => 0 });
+    expect(d.speedMul(0)).toBeCloseTo(1 / 0.35, 9);
+    s.pace = 'detailed';
+    expect(d.speedMul(0)).toBe(1);
+    s.pace = 'cinematic';
+    expect(d.speedMul(0)).toBe(1);
+  });
+  it('update applies maxInFlight to every attached line', () => {
+    const s: Settings = { ...defaultSettings, pace: 'cinematic' };
+    const d = new Director({ settings: () => s, now: () => 0 });
+    const line = new Line([st], [[0, 0, 0]], []);
+    d.attach('letter', { line, firstStage: 'flask', slotPos: () => null });
+    d.update(0.01);
+    expect(line.maxInFlight).toBe(1);
+    s.pace = 'auto';
+    d.update(0.01);
+    expect(line.maxInFlight).toBe(Infinity);
   });
 });

@@ -1,11 +1,14 @@
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
-import type { LayoutMode, ProductKind } from './types';
+import type { LayoutMode, Look, Pace, ProductKind, Quality } from './types';
 
 export interface LetterMarks { emboss: boolean; label: boolean; cap: boolean; shape: boolean }
 
 export interface Settings {
   product: ProductKind;
+  look: Look;
+  pace: Pace;
+  quality: Quality;
   layout: LayoutMode;
   letterMarks: LetterMarks;
   colorMode: 'accent' | 'mono';
@@ -25,7 +28,10 @@ export interface Settings {
 }
 
 export const defaultSettings: Settings = {
-  product: 'bottle',
+  product: 'letter',
+  look: 'realistic',
+  pace: 'auto',
+  quality: 'high',
   layout: 'snake',
   letterMarks: { emboss: true, label: true, cap: false, shape: false },
   colorMode: 'accent',

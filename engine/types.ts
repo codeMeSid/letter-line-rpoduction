@@ -1,5 +1,8 @@
 export type Vec3 = [number, number, number];
-export type ProductKind = 'bottle' | 'can' | 'mug' | 'cookie' | 'neon' | 'brick';
+export type ProductKind = 'letter' | 'bottle' | 'can' | 'mug' | 'cookie' | 'neon' | 'brick';
+export type Look = 'realistic' | 'lineart' | 'flat' | 'cutaway';
+export type Pace = 'auto' | 'fast' | 'detailed' | 'cinematic';
+export type Quality = 'low' | 'high';
 export type LayoutMode = 'snake' | 'pan' | 'stacked' | 'all';
 export type Special = 'none' | 'cap' | 'explode' | 'crate';
 export type JobPhase = 'queued' | 'conveyor' | 'station' | 'placing' | 'shelved' | 'rejected' | 'destroyed';
@@ -29,4 +32,6 @@ export type Command =
   | { type: 'backspace' }
   | { type: 'enter' };
 
-export const PRODUCT_KINDS: readonly ProductKind[] = ['bottle', 'can', 'mug', 'cookie', 'neon', 'brick'];
+export const PRODUCT_KINDS: readonly ProductKind[] = ['letter', 'bottle', 'can', 'mug', 'cookie', 'neon', 'brick'];
+export const LOOKS: readonly Look[] = ['realistic', 'lineart', 'flat', 'cutaway'];
+export const PACES: readonly Pace[] = ['auto', 'fast', 'detailed', 'cinematic'];

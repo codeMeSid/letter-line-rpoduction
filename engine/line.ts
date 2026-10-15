@@ -1,9 +1,11 @@
 import type { StationDef } from './station';
 import type { Job, JobPhase, Vec3 } from './types';
 
-export const CONVEYOR_SPEED = 40; // world units / sim second
+export const CONVEYOR_SPEED = 80; // world units / sim second (3D stations are about 2x wider)
 export const MIN_GAP = 14;        // world units between jobs on a conveyor segment
 export const DEFAULT_SPACE_DURATION = 0.25;
+
+export interface LineOptions { minGap?: number }
 
 export type Verdict = 'pass' | 'reject';
 export type DecideFn = (job: Job, stationIndex: number) => Verdict;
@@ -49,14 +51,20 @@ export class Line {
   private tracks = new Map<number, Track>();
   private callbacks = new Set<PhaseCb>();
   private pending: { job: Job; prev: JobPhase; phase: JobPhase }[] = [];
+  private minGap: number;
+
+  /** Jobs allowed past the queue at once (Infinity = no cap). Set per frame by the Director from the pace. */
+  maxInFlight = Infinity;
 
   constructor(
     private stations: StationDef[],
     anchors: Vec3[],
     paths: Vec3[][],
     private decide: DecideFn = () => 'pass',
+    opts: LineOptions = {},
   ) {
     if (stations.length === 0) throw new Error('Line needs at least one station');
+    this.minGap = opts.minGap ?? MIN_GAP;
     this.occupant = stations.map(() => null);
     this.segs = stations.slice(1).map(() => []);
     this.setLayout(anchors, paths);
@@ -173,6 +181,7 @@ export class Line {
 
   private intake(): void {
     if (this.occupant[0] || this.queue.length === 0) return;
+    if (this.jobs.length - this.queue.length >= this.maxInFlight) return;
     this.enterStation(0, this.queue.shift()!, 'queued');
   }
 
@@ -202,7 +211,7 @@ export class Line {
     }
     const seg = this.segs[i];
     const tail = seg[seg.length - 1];
-    if (tail && this.tracks.get(tail.id)!.dist < MIN_GAP) return;
+    if (tail && this.tracks.get(tail.id)!.dist < this.minGap) return;
     this.occupant[i] = null;
     job.phase = 'conveyor';
     job.progress = 0;
@@ -221,7 +230,7 @@ export class Line {
     for (let k = 0; k < seg.length; ) {
       const job = seg[k];
       const tr = this.tracks.get(job.id)!;
-      const limit = ahead ? ahead.dist - MIN_GAP : len;
+      const limit = ahead ? ahead.dist - this.minGap : len;
       tr.dist = Math.max(tr.dist, Math.min(tr.dist + move, limit));
       if (!ahead && tr.dist >= len && !this.occupant[s + 1]) {
         seg.splice(k, 1);
