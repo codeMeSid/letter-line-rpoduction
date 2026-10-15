@@ -57,17 +57,20 @@ uses relative imports (vitest has no alias).
 
 ## Architecture (fills in as tasks land)
 
-- `lib/` — `hl.ts` typed kernel wrapper (`hl()` → `window.HL`; `tset` needs an explicit delay arg, 0 for none),
-  `hl.node.ts` (`loadHL()` for tests), `share.ts` (`encodeShare`/`decodeShare`: `p`, `t`, `s` query params; invalid → null). `lib/hl.test.ts` checks the header hash (sha256 of everything after line 1, i.e.
-  `tail -n +2 kernel.js | shasum -a 256`) and pins the whole-file sha256 — update only if the kernel is deliberately re-vendored.
-- `app/` — `layout.tsx` (loads kernel via `next/script` beforeInteractive), `page.tsx` (client component,
-  `dynamic(..., { ssr:false })` → Scene), `globals.css` (full-viewport override, accent vars + `acc-*` classes)
+- `lib/` — `share.ts` (`encodeShare`/`decodeShare`: `p`, `t`, `s` query params; invalid → null). No kernel/SVG runtime any more.
+- `app/` — `layout.tsx` (no scripts), `page.tsx` (client component, `dynamic(..., { ssr:false })` → Scene),
+  `globals.css` (reset, `.stage` full-viewport canvas host, `.bench-*` overlay), `dev/bench` (→ `components/Bench.tsx`: a swatch per material role, look/theme/quality buttons, spark+sand emitter; add `ROWS` entries) + `dev/sound` (both 404 in production)
 - `engine/` — pure & unit-tested (no DOM): `types`, `charset`, `settings` (zustand store + `useSettings`), `clock` (WPM/speedMul),
   `events` (typed emitter), `layout` (`layoutStations`: anchors/paths per mode, footprints centred on anchors),
   `line` (`Line` pipeline; `decide` injected; jobs leave as `placing`/`rejected`; phase callbacks flush after each tick; `remove()` → `destroyed`), `input` (`keyToCommand`),
-  `station` (StationDef/Instance/Ctx types; `audio: AudioBus`; ParticleSystemLike still a placeholder),
+  `station`/`product`/`factory` (Task 9 contracts: StationCtx/Def/Instance, ProductHandle/Model, FactoryDef),
   `glyphs` (`GLYPHS`/`glyph(ch)`: single-stroke set, cell u 0..0.7 × v 0..1 v-down, caps/digits 0..0.8, x-line .25, baseline .8, descender 1; unknown → `?`),
-  `surface` (`flatSurface`/`cylinderSurface`/`topSurface` map normalised cell (u,v) → world Vec3; `glyphPaths(ch, surface, P, {scale, offset})` → one SVG `d`, back-facing segments culled with the kernel `facing` rule at az 45°; surface u 0..1 ↔ glyph u 0..0.7). Later: director, camera, loop, particles
+  `surface` (`flatSurface`/`cylinderSurface`/`topSurface` map normalised cell (u,v) → world Vec3, `FRONT_ANGLE` = −y; no SVG/culling; surface u 0..1 ↔ glyph u 0..0.7),
+  `particles` (pure sim; buffers public read-only, `specOf(kindIndex)`, `ColorKey`).
+  Three runtime (Task 6): `looks` (`Looks`: role → shared material per look; `own(role)` for per-instance; `apply`/`appearance`; background/edge/particle colours; belt texture),
+  `renderer` (`createRenderer(root, quality)`: one WebGL canvas), `stage` (`createStage`: lights, env map, tone mapping per look, `fitShadow`),
+  `loop` (`createLoop(speedMul, env?)`: the single rAF; dt clamped to `MAX_DT`, sleeps when hidden/idle, `wake()`),
+  `particlesView` (`ParticlesView`: normal + additive `THREE.Points` on `PARTICLE_LAYER`; the camera must enable that layer). Later: director, camera rig, post
 - `shelf/` — `model.ts` pure `Shelf` (lazy auto-wrap at 14, per-row `endedByNewline`, `removeNewline`; `peekLast` → slot | newline | busy | null) + view later
 - `audio/` — `types` (binding `SOUND_NAMES`/`SoundName`, `LOOP_NAMES`, `AudioProvider`, `LoopHandle`, `VoiceHandle`),
   `bus` (`AudioBus`: lazy ctx on `unlock()`, `setVolume`/`setEnabled` (master = volume², 0 when off; mute stops loop sources and

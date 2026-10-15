@@ -1,11 +1,10 @@
-import type { ProductKind } from './types';
+import type { ProductModel } from './product';
 import type { StationDef } from './station';
-import type { ProductRenderer } from './product';
+import type { ProductKind } from './types';
 
 export interface FactoryDef {
   kind: ProductKind;
-  label: string;              // HUD dropdown label e.g. 'Glass bottle'
-  stations: StationDef[];     // in process order; last must be the robot/placer
-  product: ProductRenderer;
-  rawMaterials: string[];     // names for the pour animation at station 0
+  label: string;           // HUD label, e.g. 'Cast metal letter'
+  stations: StationDef[];  // process order; last places on the shelf
+  product: ProductModel;
 }

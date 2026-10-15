@@ -1,5 +1,6 @@
 import type { Vec3 } from './types';
-import type { ColorKey, Palette } from './palette';
+
+export type ColorKey = 'mid' | 'hi' | 'edge' | 'molten' | 'drink' | 'neon' | 'flash' | 'glass' | 'label';
 
 export const MAX_PARTICLES = 4000;
 const GRAVITY = 380; // world units / s² along -z
@@ -13,7 +14,7 @@ export type ParticleKind = (typeof PARTICLE_KINDS)[number];
 /** `floor`: z where particles land (default 0, never above the emit point; pass the floor z on upper levels). */
 export interface EmitOpts { pos: Vec3; count: number; spread?: number; vel?: Vec3; life?: number; size?: number; floor?: number }
 
-interface KindSpec {
+export interface KindSpec {
   color: ColorKey | ColorKey[]; // array = random pick per particle
   grav: number;                 // multiple of GRAVITY (negative rises)
   drag: number;                 // velocity damping per second (0..)
@@ -44,31 +45,30 @@ const SPECS: Record<ParticleKind, KindSpec> = {
   pellet:   { color: 'label', grav: 1, drag: 0.1, life: 1.2, size: 1.0, bounce: 0.35 },
 };
 
-/** world → CSS px, and px per world/svg unit; supplied by the camera. */
-export interface ScreenMapper {
-  worldToScreen(v: Vec3): [number, number];
-  screenScale(): number;
+/** Spec of a particle kind by its index in PARTICLE_KINDS. */
+export function specOf(kindIndex: number): Readonly<KindSpec> {
+  return SPECS[PARTICLE_KINDS[kindIndex]];
 }
 
 const rnd = (s: number) => (Math.random() * 2 - 1) * s;
 
 /**
- * Pooled world-space particles: gravity on z, floor at the emitting z, drawn on a 2D canvas.
- * Simulation (`update`) is DOM-free; `draw` takes the canvas context.
+ * Pooled world-space particles: gravity on z, floor at the emitting z. DOM-free simulation only;
+ * `engine/particlesView.ts` draws it.
  */
 export class ParticleSystem {
   /** live particle count; slots [0, count) are alive */
   count = 0;
-  /** multiplier applied to `count` in emit (Scene sets 0.2 under reduced motion) */
+  /** multiplier applied to `count` in emit (set to 0.2 under reduced motion) */
   density = 1;
-  private kind = new Uint8Array(MAX_PARTICLES);
-  private col = new Uint8Array(MAX_PARTICLES); // index into the kind's colour list
-  private p = new Float32Array(MAX_PARTICLES * 3);
-  private v = new Float32Array(MAX_PARTICLES * 3);
+  readonly kind = new Uint8Array(MAX_PARTICLES);
+  readonly col = new Uint8Array(MAX_PARTICLES); // index into the kind's colour list
+  readonly p = new Float32Array(MAX_PARTICLES * 3);
+  readonly v = new Float32Array(MAX_PARTICLES * 3);
   private floor = new Float32Array(MAX_PARTICLES);
-  private age = new Float32Array(MAX_PARTICLES);
-  private life = new Float32Array(MAX_PARTICLES);
-  private size = new Float32Array(MAX_PARTICLES);
+  readonly age = new Float32Array(MAX_PARTICLES);
+  readonly life = new Float32Array(MAX_PARTICLES);
+  readonly size = new Float32Array(MAX_PARTICLES);
   private cursor = 0; // ring cursor for overwriting the oldest when full
 
   emit(kind: ParticleKind, o: EmitOpts): void {
@@ -125,42 +125,6 @@ export class ParticleSystem {
   /** z of particle i (tests). */
   zOf(i: number): number {
     return this.p[i * 3 + 2];
-  }
-
-  draw(ctx: CanvasRenderingContext2D, cam: ScreenMapper, pal: Palette, w: number, h: number): void {
-    ctx.clearRect(0, 0, w, h);
-    if (this.count === 0) return;
-    const scale = cam.screenScale();
-    for (let pass = 0; pass < 2; pass++) {
-      ctx.globalCompositeOperation = pass === 0 ? 'source-over' : 'lighter';
-      for (let i = 0; i < this.count; i++) {
-        const s = SPECS[PARTICLE_KINDS[this.kind[i]]];
-        if (!!s.additive !== (pass === 1)) continue;
-        const b = i * 3;
-        const [x, y] = cam.worldToScreen([this.p[b], this.p[b + 1], this.p[b + 2]]);
-        if (x < -20 || y < -20 || x > w + 20 || y > h + 20) continue;
-        const t = this.age[i] / this.life[i];
-        const r = Math.max(0.5, this.size[i] * scale * (1 + ((s.grow ?? 1) - 1) * t));
-        const key = Array.isArray(s.color) ? s.color[this.col[i]] : s.color;
-        ctx.globalAlpha = 1 - t;
-        if (s.streak) {
-          const [x2, y2] = cam.worldToScreen([this.p[b] - this.v[b] * 0.02, this.p[b + 1] - this.v[b + 1] * 0.02, this.p[b + 2] - this.v[b + 2] * 0.02]);
-          ctx.strokeStyle = pal.get(key);
-          ctx.lineWidth = r;
-          ctx.beginPath();
-          ctx.moveTo(x, y);
-          ctx.lineTo(x2, y2);
-          ctx.stroke();
-        } else {
-          ctx.fillStyle = pal.get(key);
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-    }
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
   }
 
   clear(): void {
