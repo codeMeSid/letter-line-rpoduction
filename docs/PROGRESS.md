@@ -6,7 +6,7 @@ Plan: `docs/plan.md`. Controller-owned file (implementers do not edit it).
 
 | Task | Title | Status | Commits |
 | --- | --- | --- | --- |
-| 1 | Scaffold + kernel + wrapper | pending | |
+| 1 | Scaffold + kernel + wrapper | complete (1 fix round) | 18c7d44..4b86567 |
 | 2 | Core pure logic | pending | |
 | 3 | Glyphs + surfaces | pending | |
 | 4 | Audio bus + synth | pending | |
@@ -54,6 +54,14 @@ Format: `Ruling: <what> — <why> — <cost if wrong>`
 
 - Ruling: T8 broom uses `smoke` particles (not a non-existent `dust` kind) — keeps particle kinds fixed in T5 — none.
 
+- Ruling (T1): Pulled minor finding "accent classes beat kernel .nf/.fo" into fix round 1 — later tasks (neon, flash) combine them — none.
+
+## Notes for later tasks
+
+- `HL.tset(tw, to, now, delay)` requires `delay` (pass 0); omitting it yields NaN.
+- TypeScript pinned to 5.9 (Next 15 needs the JS compiler API).
+
 ## Deferred minor findings
 
-(none yet)
+- T1: `@types/node ^26` vs Node 25 runtime (harmless).
+- T1: `jsdom` installed but unused so far.
