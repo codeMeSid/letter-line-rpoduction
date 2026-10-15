@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { HLKernel } from './hl';
 
-/** Path of the vendored kernel, relative to the repo root. */
-export const KERNEL_PATH = join(process.cwd(), 'public', 'hairline', 'kernel.js');
+/** Path of the vendored kernel, resolved from this file. */
+export const KERNEL_PATH = fileURLToPath(new URL('../public/hairline/kernel.js', import.meta.url));
 
 /** Tests only: evaluates the vendored kernel source and returns its `HL` global. */
 export function loadHL(): HLKernel {

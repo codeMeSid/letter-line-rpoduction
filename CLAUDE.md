@@ -53,8 +53,8 @@ Import app code with the `@/` alias (maps to repo root).
 ## Architecture (fills in as tasks land)
 
 - `lib/` — `hl.ts` typed kernel wrapper (`hl()` → `window.HL`; `tset` needs an explicit delay arg, 0 for none),
-  `hl.node.ts` (`loadHL()` for tests), share codec later. `lib/hl.test.ts` pins the kernel file's sha256 —
-  update the constant only if the kernel is deliberately re-vendored.
+  `hl.node.ts` (`loadHL()` for tests), share codec later. `lib/hl.test.ts` checks the header hash (sha256 of everything after line 1, i.e.
+  `tail -n +2 kernel.js | shasum -a 256`) and pins the whole-file sha256 — update only if the kernel is deliberately re-vendored.
 - `app/` — `layout.tsx` (loads kernel via `next/script` beforeInteractive), `page.tsx` (client component,
   `dynamic(..., { ssr:false })` → Scene), `globals.css` (full-viewport override, accent vars + `acc-*` classes)
 - `engine/` — types, settings store, clock, line pipeline, layout, input, director, camera, loop, particles

@@ -73,3 +73,23 @@ body {
   stroke: var(--acc-label);
   fill: var(--acc-label);
 }
+
+/* The accent rules above out-specify the kernel's .nf / .fo; restore them, in both colour modes
+   (same specificity as the accent rules, declared later). */
+[data-hairline] svg .nf.acc-molten,
+[data-hairline] svg .nf.acc-drink,
+[data-hairline] svg .nf.acc-neon,
+[data-hairline] svg .nf.acc-flash,
+[data-hairline] svg .nf.acc-glass,
+[data-hairline] svg .nf.acc-label {
+  fill: none;
+}
+
+[data-hairline] svg .fo.acc-molten,
+[data-hairline] svg .fo.acc-drink,
+[data-hairline] svg .fo.acc-neon,
+[data-hairline] svg .fo.acc-flash,
+[data-hairline] svg .fo.acc-glass,
+[data-hairline] svg .fo.acc-label {
+  stroke: none;
+}

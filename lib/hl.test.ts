@@ -16,7 +16,16 @@ describe('vendored kernel', () => {
     expect(first).toMatch(/^\/\* hairline kernel sha256:[0-9a-f]{64} \*\/$/);
   });
 
-  it('is unchanged (file sha256 matches the recorded value)', () => {
+  it('header hash equals sha256 of everything after the first line', () => {
+    const nl = src.indexOf(0x0a);
+    expect(nl).toBeGreaterThan(0);
+    const header = src.subarray(0, nl).toString('utf8');
+    const declared = /^\/\* hairline kernel sha256:([0-9a-f]{64}) \*\/$/.exec(header)?.[1];
+    expect(declared).toBeDefined();
+    expect(createHash('sha256').update(src.subarray(nl + 1)).digest('hex')).toBe(declared);
+  });
+
+  it('is unchanged (whole-file sha256 matches the recorded value)', () => {
     expect(createHash('sha256').update(src).digest('hex')).toBe(KERNEL_FILE_SHA256);
   });
 });
