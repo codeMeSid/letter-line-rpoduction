@@ -325,13 +325,13 @@ import { letterGeometry } from './letterSolid';
 const O = { height: 26, radius: 2.3 };
 
 describe('letterGeometry', () => {
-  it('fits the glyph cell plus radius: bottom z=0, centred on x, thickness ±radius', () => {
+  it('keeps the glyph cell z (R2), centred on x, thickness ±radius', () => {
     for (const ch of CHARSET) {
       const g = letterGeometry(ch, O);
       const bb = g.boundingBox!;
       expect(g.getAttribute('position').count, ch).toBeGreaterThan(0);
-      expect(bb.min.z, ch).toBeCloseTo(0, 6);
-      expect(bb.max.z, ch).toBeLessThanOrEqual(O.height + 2 * O.radius + 1e-6);
+      expect(bb.min.z, ch).toBeGreaterThanOrEqual(-O.radius - 1e-6);
+      expect(bb.max.z, ch).toBeLessThanOrEqual(O.height + O.radius + 1e-6);
       expect(bb.min.x + bb.max.x, ch).toBeCloseTo(0, 6);
       expect(bb.max.x - bb.min.x, ch).toBeLessThanOrEqual(0.7 * O.height + 2 * O.radius + 1e-6);
       expect(bb.min.y, ch).toBeGreaterThanOrEqual(-O.radius - 1e-6);
@@ -363,7 +363,7 @@ const Y = new THREE.Vector3(0, 1, 0);
 /**
  * Thick-stroke letter built from the single-stroke glyph: a cylinder per segment plus a sphere at every
  * stroke point, merged into one geometry. Upright in the x/z plane, reading +x, facing −y (thickness
- * along y). Normalised: bottom at z = 0, x-extent centred on 0. Cached per (char, height, radius) —
+ * along y). Cell kept: z = (1 − v)·height, baseline at (1 − GLYPH_BASE)·height (ruling R2); x-extent centred on 0. Cached per (char, height, radius) —
  * callers must NOT dispose it.
  */
 export function letterGeometry(ch: string, o: LetterSolidOpts): THREE.BufferGeometry {
@@ -389,7 +389,7 @@ export function letterGeometry(ch: string, o: LetterSolidOpts): THREE.BufferGeom
   for (const p of parts) p.dispose();
   merged.computeBoundingBox();
   const bb = merged.boundingBox!;
-  merged.translate(-(bb.min.x + bb.max.x) / 2, 0, -bb.min.z);
+  merged.translate(-(bb.min.x + bb.max.x) / 2, 0, 0);
   merged.computeBoundingBox();
   merged.computeBoundingSphere();
   cache.set(key, merged);
@@ -3166,7 +3166,8 @@ describe('letterProduct', () => {
     expect(h.root.getObjectByName('bed')!.visible).toBe(false);
     h.root.updateMatrixWorld(true);
     const b = new THREE.Box3().setFromObject(letter);
-    expect(b.min.z).toBeCloseTo(0, 1);
+    expect(b.min.z).toBeGreaterThanOrEqual(-1e-6); // baseline strokes rest on z=0 (R3); sphere tessellation lifts ≤ 0.15
+    expect(b.min.z).toBeLessThan(0.25);
   });
   it('a space job is a bare pallet that survives every stage', () => {
     const looks = new Looks(opts);
@@ -3254,30 +3255,32 @@ class LetterHandle implements ProductHandle {
   // - sand: looks.part(sand, 'sand') at z = PALLET_T, scaled z by max(1e-3, v.sand * (0.15 + 0.85 * v.sandLeft)),
   //         x/y by 0.6 + 0.4 * v.sandLeft
   // - cavity: looks.part(letterGeometry(char), 'rubber'); rotation.x = -π/2; scale (v.cavity, 0.15, v.cavity);
-  //           position (0, -hz/2, SAND_TOP - 0.25); visible = v.cavity > 0.01 && v.sandLeft > 0.5 && v.fill < 1
-  // - letter group (name 'letter'): rotation.x = -π/2 while on the line, position.y = -hz/2,
+  //           position (0, -zMid, SAND_TOP - 0.25); visible = v.cavity > 0.01 && v.sandLeft > 0.5 && v.fill < 1
+  // - letter group (name 'letter'): rotation.x = -π/2 while on the line, position.y = -zMid,
   //           position.z = lerp(PALLET_T + LETTER_R, SAND_TOP - 0.4 * LETTER_R, v.sandLeft)
   //     metal (name 'metal'): new THREE.Mesh(letterGeometry(char, {height: LETTER_H, radius: LETTER_R}), mat)
   //           NO userData.role (own material); castShadow/receiveShadow true; visible = v.fill > 0
   //     flash (name 'flash'): Mesh(letterGeometry(char, {height: LETTER_H, radius: LETTER_R * 1.7}), mat), scale.y = 0.22,
   //           scale.x/z = 1, visible = v.rough > 0.01 && v.fill >= 1; when visible scale.y = 0.22 * v.rough
-  //     sprue (name 'sprue'): Mesh(sprue, mat) at (bb.min.x + LETTER_R, 0, hz * 0.5) in letter-upright coords
+  //     sprue (name 'sprue'): Mesh(sprue, mat) at (bb.min.x + LETTER_R, 0, zMid) in letter-upright coords
   //           (sticks out of the letter's left side), scale = v.rough (all axes, exactly — may be 0),
   //           visible = v.rough > 0.01
-  //   hz = letterGeometry(...).boundingBox.max.z
+  //   bb = letterGeometry(...).boundingBox (cell z kept, ruling R2: min.z may be < 0 for descenders, > 0 for caps)
+  //   zMid = (bb.min.z + bb.max.z) / 2; hz = bb.max.z - bb.min.z
+  //   BASE_Z = (1 - GLYPH_BASE) * LETTER_H - LETTER_R  (upright: shift z by -BASE_Z so baseline strokes rest on z=0, R3)
   // - mat = looks.own('product'); mat.clippingPlanes = [plane] (plane world-space, normal (0,-1,0))
   // shape(stage, t):
   //   v = letterVisual(stage, t); store [stage, t];
   //   apply the transforms above; flaskL.position.x = -26 * v.flaskOpen, flaskR.position.x = +26 * v.flaskOpen,
   //   both visible = v.flaskOpen < 0.98;
-  //   fill plane: this.root.updateWorldMatrix(true, false); y0 = root world y - hz/2;
+  //   fill plane: this.root.updateWorldMatrix(true, false); y0 = root world y + (letter.position.y + bb.min.z) (flat: the letter's bottom edge in world y);
   //     plane.constant = v.fill >= 1 ? 1e6 : y0 + v.fill * hz   (keeps world y ≤ level)
   //   appearance: color = v.polish > 0 ? STEEL.lerp(CHROME, polish) : STEEL.lerp(IRON, rough);
   //     emissive = heatColor(v.heat * (v.fill > 0 ? 1 : 0)); emissiveIntensity = 3.5 * v.heat * (v.fill > 0 ? 1 : 0);
   //     metalness = 0.5 + 0.5 * v.polish; roughness = v.polish > 0 ? lerp(0.45, 0.1, v.polish) : lerp(0.45, 0.85, v.rough)
   //     → this.ctx.looks.appearance(mat, {...})
-  // place(t): store t; e = smoothstep(t); letter.rotation.x = -π/2 * (1 - e); letter.position.y = -hz/2 * (1 - e);
-  //   letter.position.z = (PALLET_T + LETTER_R) * (1 - e); bed.visible = t <= 0.02
+  // place(t): store t; e = smoothstep(t); letter.rotation.x = -π/2 * (1 - e); letter.position.y = -zMid * (1 - e);
+  //   letter.position.z = (PALLET_T + LETTER_R) * (1 - e) - BASE_Z * e; bed.visible = t <= 0.02
   // restyle(): old = mat; mat = looks.own('product') with clippingPlanes = [plane]; assign to metal/flash/sprue;
   //   old.dispose(); re-run shape(...last); if placed > 0 re-run place(placed)
   // dispose(): mat.dispose(); root.removeFromParent()   (shared/cached geometries are never disposed)
