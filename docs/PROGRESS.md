@@ -1,6 +1,8 @@
 # Progress, rulings and deferred findings
 
-Plan: `docs/plan.md`. Controller-owned file (implementers do not edit it).
+Plan: `docs/superpowers/plans/2026-10-16-3d-core-metal-letter.md` (Tasks 5–12, 3D pivot; spec
+`docs/superpowers/specs/2026-10-16-3d-factory-design.md`). `docs/plan.md` Tasks 1–4 stay valid history;
+its Tasks 5–13 are superseded. Controller-owned file (implementers do not edit it).
 
 ## Task status
 
@@ -10,15 +12,15 @@ Plan: `docs/plan.md`. Controller-owned file (implementers do not edit it).
 | 2 | Core pure logic | complete (1 fix round) | 1df5281..ca6974d |
 | 3 | Glyphs + surfaces | complete | b703d52..8810fe9 |
 | 4 | Audio bus + synth | complete | b12795e..392b05b |
-| 5 | Runtime engine + director + demo factory | pending | |
-| 6 | Bottle factory part 1 (stations 1–7) | pending | |
-| 7 | Bottle factory part 2 (stations 8–13) | pending | |
-| 8 | Destruction FX | pending | |
-| 9 | HUD + gauges + live switching | pending | |
-| 10 | Extras | pending | |
-| 11 | Can, mug, cookie factories | pending | |
-| 12 | Neon, brick, buildings, campus pan | pending | |
-| 13 | Perf, reduced motion, a11y, polish | pending | |
+| 5 (old) | SVG runtime + demo line | superseded (snapshot b36476b) | b36476b |
+| 5 | Pure groundwork (pace, line opts, −y layout, letter solid, IK) | pending | |
+| 6 | Three runtime swap (renderer, stage, looks, loop, particles, bench) | pending | |
+| 7 | Post-processing + camera rig | pending | |
+| 8 | Parts kit, conveyor, robot arm | pending | |
+| 9 | 3D contracts, factory host, shelf, scene, minimal HUD | pending | |
+| 10 | Cast metal letter product | pending | |
+| 11 | Letter stations 1–4 | pending | |
+| 12 | Letter stations 5–7, registry, end-to-end | pending | |
 | Final | Whole-branch review | pending | |
 
 ## Rulings (decisions made on the user's behalf)
@@ -38,6 +40,11 @@ Format: `Ruling: <what> — <why> — <cost if wrong>`
 - Ruling: Work on branch `feat/factory-line` off an initial docs commit on `main` in a freshly initialized repo — SDD forbids implementing on main; repo had no git — none.
 - Ruling: No external spec exists beyond `docs/original-plan.md` + chat Q&A; rulings are provisional against it.
 - Ruling: Sounds are procedural Web Audio now; `audio/samples.ts` provider stub kept unwired for future base64 samples (user: "A for now but also build for B").
+
+- Ruling (2026-10-16, user interview): pivot from Hairline 2D SVG to Three.js with four looks (realistic, lineart,
+  flat iso, cutaway); procedural machines; first products cast metal letter then glass bottle; pacing modes
+  auto/fast/detailed/cinematic; keep all old features, built alongside; desktop target; sound default off.
+  Old Task 5 demo line rejected by the user as placeholder boxes — never ship placeholder visuals as a result.
 
 ## Pre-flight scan
 

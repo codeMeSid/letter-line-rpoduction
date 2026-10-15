@@ -4,16 +4,20 @@ Read this first in every new session.
 
 ## What this is
 
-A full-page Next.js app: every typed character runs an animated isometric line-art factory
-(Hairline aesthetic) that turns raw material into a product bearing that character and shelves
-it like a typewriter. Space = empty slot, Backspace = shotgun / reject chute, Enter = new row
-(or forklift ships the row). Six product factories (glass bottle, can, mug, cookie, neon, toy
-brick), procedural sound, collapsible HUD.
+A full-page Next.js app: every typed character runs an animated 3D factory (Three.js, four looks:
+realistic, line-art, flat iso, cutaway) whose real procedural machines visibly turn raw material into
+a product that is or bears that character, then shelve it like a typewriter. Space = empty slot, Backspace = shotgun / reject chute, Enter = new row
+(or forklift ships the row). Product factories: cast metal letter
+(first), glass bottle, can, mug, cookie, neon, toy brick. Procedural sound (default off), collapsible HUD.
+**User bar:** real machinery, the product visibly taking shape — never placeholder boxes.
 
 ## Where things are
 
-- `docs/plan.md` — the executable plan: Global Constraints, shared interfaces, Tasks 1–13. Binding.
-- `docs/original-plan.md` — the approved high-level plan + the user's Q&A choices.
+- `docs/superpowers/specs/2026-10-16-3d-factory-design.md` — the 3D pivot design (binding).
+- `docs/superpowers/plans/2026-10-16-3d-core-metal-letter.md` — current executable plan: Global Constraints,
+  Tasks 5–12 (3D core + metal letter). Binding. Later milestones get their own plan files.
+- `docs/plan.md` — original plan; Tasks 1–4 history, Tasks 5–13 superseded by the 3D pivot.
+- `docs/original-plan.md` — the first high-level plan + the user's Q&A choices (rendering parts superseded).
 - `docs/PROGRESS.md` — task status, rulings (decisions made on the user's behalf), deferred findings.
   **Resume from the first task not marked complete.**
 - `.superpowers/sdd/<plan-slug>/` (git-ignored) — subagent-driven-development scratch: task briefs,
@@ -28,26 +32,27 @@ brick), procedural sound, collapsible HUD.
 
 ## Commands
 
-- `pnpm dev` — dev server (http://localhost:3000, `?debug=1` for perf overlay once Task 13 lands)
+- `pnpm dev` — dev server (http://localhost:3000; `/dev/bench` 3D parts/looks bench, `/dev/sound` sound audition)
 - `pnpm typecheck` — `tsc --noEmit`
 - `pnpm test` — `vitest run`
 - `pnpm build` — `next build`
 All three of typecheck/test/build must pass before every commit.
 Tooling: pnpm, Node 25, Next 15.5 + React 19, TypeScript 5.9 (pinned `typescript@5`; Next 15 needs the JS
 compiler API), vitest 5 (node env; `vitest.config.ts` loads as ESM via `"type": "module"`).
-Import app code with the `@/` alias (maps to repo root).
+`app/` and `components/` may import with `@/`; everything under `engine/ factories/ shelf/ audio/ lib/ hud/`
+uses relative imports (vitest has no alias).
 
-## Non-negotiable conventions (full list: Global Constraints in `docs/plan.md`)
+## Non-negotiable conventions (full list: Global Constraints in the current plan)
 
-- `public/hairline/kernel.js` is a byte-identical copy of the Hairline kernel. Never edit it.
-  Access only via `lib/hl.ts` (browser) / `lib/hl.node.ts` (tests).
-- One camera `HL.Cam(45, 0.5, 1)`, ox=oy=0; camera pans via SVG viewBox. Moving objects drawn once
-  at origin and translated.
-- All motion inside the single `HL.register` loop (`engine/loop.ts`). No own rAF/setInterval/CSS
-  keyframes for scene objects.
-- Palette: kernel classes + project accent classes (`acc-*`) only. No inline colours.
-- Letters in the drawing only via `engine/glyphs.ts` stroke glyphs. No `<text>` in the world SVG.
-- Sound only via `audio/bus.ts`.
+- Three.js (`three@0.186.1`), imperative, outside React. **World z-up**; viewer stands at −y so +x reads
+  left→right; shelf in front of the line.
+- Meshes only via `looks.part(geom, role)` (or `new Mesh(geom, looks.own(role))` for animated per-instance
+  materials). No `new *Material` outside `engine/looks.ts` (shader exceptions: `edgePass.ts`, `particlesView.ts`).
+- One rAF loop (`engine/loop.ts`). No own rAF/setInterval/CSS animation for scene objects.
+- Letters only from `engine/glyphs.ts` strokes (`letterGeometry`). No fonts/TextGeometry.
+- Sound only via `audio/bus.ts`; default off. Particles only while a station processes a non-space job.
+- Station local frame: z=0 = belt top (`BELT_TOP` 22), floor at z=−22. Products: built once at own origin,
+  `shape(stage, t)` continuous across stages.
 - One responsibility per file; each station its own file.
 
 ## Architecture (fills in as tasks land)
