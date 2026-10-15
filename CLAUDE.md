@@ -53,12 +53,15 @@ Import app code with the `@/` alias (maps to repo root).
 ## Architecture (fills in as tasks land)
 
 - `lib/` — `hl.ts` typed kernel wrapper (`hl()` → `window.HL`; `tset` needs an explicit delay arg, 0 for none),
-  `hl.node.ts` (`loadHL()` for tests), share codec later. `lib/hl.test.ts` checks the header hash (sha256 of everything after line 1, i.e.
+  `hl.node.ts` (`loadHL()` for tests), `share.ts` (`encodeShare`/`decodeShare`: `p`, `t`, `s` query params; invalid → null). `lib/hl.test.ts` checks the header hash (sha256 of everything after line 1, i.e.
   `tail -n +2 kernel.js | shasum -a 256`) and pins the whole-file sha256 — update only if the kernel is deliberately re-vendored.
 - `app/` — `layout.tsx` (loads kernel via `next/script` beforeInteractive), `page.tsx` (client component,
   `dynamic(..., { ssr:false })` → Scene), `globals.css` (full-viewport override, accent vars + `acc-*` classes)
-- `engine/` — types, settings store, clock, line pipeline, layout, input, director, camera, loop, particles
-- `shelf/` — shelf model (pure) + view
+- `engine/` — pure & unit-tested (no DOM): `types`, `charset`, `settings` (zustand store + `useSettings`), `clock` (WPM/speedMul),
+  `events` (typed emitter), `layout` (`layoutStations`: anchors/paths per mode, footprints centred on anchors),
+  `line` (`Line` pipeline; `decide` injected; jobs leave as `placing`/`rejected`), `input` (`keyToCommand`),
+  `station` (StationDef/Instance/Ctx types, placeholder particle/audio interfaces). Later: director, camera, loop, particles
+- `shelf/` — `model.ts` pure `Shelf` (lazy auto-wrap at 14, per-row `endedByNewline`, `removeNewline`) + view later
 - `audio/` — bus, synth provider, sample provider stub
 - `factories/` — one folder per product + `shared/` parts and robot arm
 - `fx/` — shotgun, chute, broom, forklift, workers, day/night
