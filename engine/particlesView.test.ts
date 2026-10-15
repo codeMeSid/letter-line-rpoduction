@@ -18,4 +18,11 @@ describe('ParticlesView', () => {
     expect(normal.layers.mask).toBe(1 << PARTICLE_LAYER);
     view.dispose();
   });
+  it('converts output colour space in the fragment shader', () => {
+    const view = new ParticlesView(new ParticleSystem(), () => new THREE.Color(1, 0, 0));
+    for (const pts of view.group.children as THREE.Points[]) {
+      expect((pts.material as THREE.ShaderMaterial).fragmentShader).toContain('colorspace_fragment');
+    }
+    view.dispose();
+  });
 });

@@ -26,6 +26,7 @@ void main() {
   float r = length(gl_PointCoord - 0.5);
   if (r > 0.5) discard;
   gl_FragColor = vec4(vColor, vAlpha * smoothstep(0.5, 0.15, r));
+  #include <colorspace_fragment>
 }`;
 
 interface Set_ { points: THREE.Points; pos: Float32Array; col: Float32Array; size: Float32Array; alpha: Float32Array }
