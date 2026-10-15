@@ -60,7 +60,9 @@ Import app code with the `@/` alias (maps to repo root).
 - `engine/` — pure & unit-tested (no DOM): `types`, `charset`, `settings` (zustand store + `useSettings`), `clock` (WPM/speedMul),
   `events` (typed emitter), `layout` (`layoutStations`: anchors/paths per mode, footprints centred on anchors),
   `line` (`Line` pipeline; `decide` injected; jobs leave as `placing`/`rejected`; phase callbacks flush after each tick; `remove()` → `destroyed`), `input` (`keyToCommand`),
-  `station` (StationDef/Instance/Ctx types, placeholder particle/audio interfaces). Later: director, camera, loop, particles
+  `station` (StationDef/Instance/Ctx types, placeholder particle/audio interfaces),
+  `glyphs` (`GLYPHS`/`glyph(ch)`: single-stroke set, cell u 0..0.7 × v 0..1 v-down, caps/digits 0..0.8, x-line .25, baseline .8, descender 1; unknown → `?`),
+  `surface` (`flatSurface`/`cylinderSurface`/`topSurface` map normalised cell (u,v) → world Vec3; `glyphPaths(ch, surface, P, {scale, offset})` → one SVG `d`, back-facing segments culled with the kernel `facing` rule at az 45°; surface u 0..1 ↔ glyph u 0..0.7). Later: director, camera, loop, particles
 - `shelf/` — `model.ts` pure `Shelf` (lazy auto-wrap at 14, per-row `endedByNewline`, `removeNewline`; `peekLast` → slot | newline | busy | null) + view later
 - `audio/` — bus, synth provider, sample provider stub
 - `factories/` — one folder per product + `shared/` parts and robot arm
