@@ -64,7 +64,14 @@ Import app code with the `@/` alias (maps to repo root).
   `glyphs` (`GLYPHS`/`glyph(ch)`: single-stroke set, cell u 0..0.7 × v 0..1 v-down, caps/digits 0..0.8, x-line .25, baseline .8, descender 1; unknown → `?`),
   `surface` (`flatSurface`/`cylinderSurface`/`topSurface` map normalised cell (u,v) → world Vec3; `glyphPaths(ch, surface, P, {scale, offset})` → one SVG `d`, back-facing segments culled with the kernel `facing` rule at az 45°; surface u 0..1 ↔ glyph u 0..0.7). Later: director, camera, loop, particles
 - `shelf/` — `model.ts` pure `Shelf` (lazy auto-wrap at 14, per-row `endedByNewline`, `removeNewline`; `peekLast` → slot | newline | busy | null) + view later
-- `audio/` — bus, synth provider, sample provider stub
+- `audio/` — `types` (binding `SOUND_NAMES`/`SoundName`, `LOOP_NAMES`, `AudioProvider`, `LoopHandle`, `VoiceHandle`),
+  `bus` (`AudioBus`: lazy ctx on `unlock()`, `setVolume`/`setEnabled` (master = volume², 0 when off), `setListener(xCenter, halfWidth)` +
+  `play(name, {x|pan, gain, rate})`, per-name throttle 40ms (key-clack 15), 24-voice cap drops oldest, loops queued until unlock; takes no
+  settings import — Task 5 wires the store), `synth/` (active procedural provider `SynthProvider`; `voice.ts` = Voice helper with
+  `tone()`/`burst()`/raw oscillators+noise; one file per sound family; `loops.ts`; `noise.ts` crossfaded seamless noise buffers),
+  `samples.ts` (`SampleProvider` stub, empty `SAMPLE_URLS`), `fakeContext.ts` (fake Web Audio for node tests only).
+  Dev aid: `/dev/sound` page (hidden) auditions every sound/loop and has an offline-render level check.
+  Providers' `play` returns a `VoiceHandle` so the bus can count/stop voices.
 - `factories/` — one folder per product + `shared/` parts and robot arm
 - `fx/` — shotgun, chute, broom, forklift, workers, day/night
 - `hud/` — React HUD + gauges
