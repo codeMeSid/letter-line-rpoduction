@@ -1,8 +1,9 @@
 import type { FactoryDef } from '../engine/factory';
 import { PRODUCT_KINDS, type ProductKind, type Vec3 } from '../engine/types';
+import { letterFactory } from './letter';
 
-/** ProductKind → FactoryDef. Empty until the factories land (Tasks 10+). */
-export const FACTORIES: Partial<Record<ProductKind, FactoryDef>> = {};
+/** ProductKind → FactoryDef. */
+export const FACTORIES: Partial<Record<ProductKind, FactoryDef>> = { letter: letterFactory };
 
 export const FACTORY_SPACING = 1600;
 

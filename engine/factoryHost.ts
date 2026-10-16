@@ -177,9 +177,9 @@ export class FactoryHost {
     this.instances[job.stationIndex]?.begin(job, h);
   }
 
-  /** Machines are what the cutaway section slices: tag every mesh `userData.cut` and re-pick its material. */
+  /** Machines are what the cutaway section slices: tag every mesh `userData.cut` (unless it opted out with `cut = false`) and re-pick its material. */
   private cutTag(group: THREE.Object3D): void {
-    group.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.userData.cut = true; });
+    group.traverse((o) => { if ((o as THREE.Mesh).isMesh && o.userData.cut !== false) o.userData.cut = true; });
     this.d.looks.apply(group);
   }
 

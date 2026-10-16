@@ -103,9 +103,9 @@ function sharpen(profile: [number, number][]): THREE.Vector2[] {
   return out;
 }
 
-/** Lathe around the z axis; profile = [radius, z] pairs. */
-export function lathe(looks: Looks, profile: [number, number][], role: MaterialRole, seg = 32): THREE.Mesh {
-  const g = new THREE.LatheGeometry(sharpen(profile), seg).rotateX(Math.PI / 2);
+/** Lathe around the z axis; profile = [radius, z] pairs. `arc` = [start, length] sweep (angle measured from −y toward +x). */
+export function lathe(looks: Looks, profile: [number, number][], role: MaterialRole, seg = 32, arc: [number, number] = [0, Math.PI * 2]): THREE.Mesh {
+  const g = new THREE.LatheGeometry(sharpen(profile), seg, arc[0], arc[1]).rotateX(Math.PI / 2);
   return looks.part(g, role);
 }
 

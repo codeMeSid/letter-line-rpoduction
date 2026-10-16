@@ -5,8 +5,11 @@ import type { StationDef } from '../../engine/station';
 import { BELT_W } from '../shared/dims';
 import { LETTER_H, LETTER_R } from './product';
 import { cooling } from './stations/cooling';
+import { grinder } from './stations/grinder';
 import { moulder } from './stations/moulder';
+import { polish } from './stations/polish';
 import { pour } from './stations/pour';
+import { robot } from './stations/robot';
 import { shakeout } from './stations/shakeout';
 import { drive, job, recProduct, runJob, testCtx } from './stations/testkit';
 
@@ -16,6 +19,8 @@ const STATIONS: [StationDef, string, Record<string, number>][] = [
   [pour, 'poured', { hiss: 1 }],
   [cooling, 'cooled', { hiss: 1 }],
   [shakeout, 'cast', { crunch: 1, 'press-thump': 1 }],
+  [grinder, 'ground', { 'motor-whir': 1 }],
+  [polish, 'polished', { 'motor-whir': 1, hiss: 1 }],
 ];
 
 const tally = (names: string[]) => names.reduce<Record<string, number>>((m, n) => ({ ...m, [n]: (m[n] ?? 0) + 1 }), {});
@@ -123,5 +128,36 @@ describe('shakeout', () => {
     }
     expect(Math.max(...zs) - Math.min(...zs)).toBeGreaterThan(0.5);
     expect(p.root.position.toArray()).toEqual(j.pos); // t = 1: no offset left over
+  });
+});
+
+describe('robot', () => {
+  it('has no output stage, makes no shape calls, and passes', () => {
+    expect(robot.outputStage).toBeUndefined();
+    const r = runJob(robot, job('A'));
+    expect(r.p.shapes).toEqual([]);
+    expect(r.verdict).toBe('pass');
+  });
+  it('tracks a placing job with its gripper', () => {
+    const k = testCtx();
+    const placing = { ...job('A'), phase: 'placing' as const, pos: [200, -300, 60] as [number, number, number] };
+    k.ctx.placing = () => [placing];
+    const inst = robot.create(k.ctx);
+    for (let i = 0; i < 240; i++) inst.update(1 / 60, null, 0, null);
+    k.group.updateMatrixWorld(true);
+    const p = k.group.getObjectByName('robot-tip')!.getWorldPosition(new THREE.Vector3());
+    expect(Math.hypot(p.x - 200, p.y + 300)).toBeLessThan(25);
+  });
+  it('a letter job beeps its servo once; a space job is silent', () => {
+    expect(runJob(robot, job('A')).k.plays).toEqual(['robot-servo']);
+    expect(runJob(robot, job('', true)).k.plays).toEqual([]);
+  });
+  it('builds geometry, idles without a job, and cleans up on destroy', () => {
+    const k = testCtx();
+    const inst = robot.create(k.ctx);
+    expect(k.group.children.length).toBeGreaterThan(0);
+    for (let i = 0; i < 10; i++) inst.update(1 / 30, null, 0, null);
+    inst.destroy();
+    expect(k.group.children.length).toBe(0);
   });
 });
