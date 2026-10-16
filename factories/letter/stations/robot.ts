@@ -6,6 +6,8 @@ import { RobotArm } from '../../shared/robotArm';
 import { LETTER_H, LETTER_R, PALLET_T } from '../product';
 import { FLOOR, ease, ss, stationBase, teardown } from './common';
 
+/** Rail line behind the front plank: clears 3 tray rows × 40 + plank depth, so the arm reaches over the older rows (R24). */
+export const RAIL_BEHIND = 150;
 const GAUGE = 14;               // rails at y ±14 under the carriage
 const RAIL = 5;
 const RAIL_Z = FLOOR + 3;       // rail centre line
@@ -47,7 +49,7 @@ export const robot: StationDef = {
 
     // Rail along the shelf front (world x range covers the shelf and this station), built in station-local coords.
     const span = ctx.shelfSpan();
-    const railY = span.y + 60;
+    const railY = span.y + RAIL_BEHIND;
     const lo = Math.min(span.x0, ox) - 30;
     const hi = Math.max(span.x1, ox) + 30;
     const rig = new THREE.Group();

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { PLACE_ARC } from '../../engine/director';
 import { letterGeometry } from '../../engine/letterSolid';
 import type { StationDef } from '../../engine/station';
 import { BELT_W } from '../shared/dims';
@@ -9,7 +10,7 @@ import { grinder } from './stations/grinder';
 import { moulder } from './stations/moulder';
 import { polish } from './stations/polish';
 import { pour } from './stations/pour';
-import { robot } from './stations/robot';
+import { RAIL_BEHIND, robot } from './stations/robot';
 import { shakeout } from './stations/shakeout';
 import { drive, job, recProduct, runJob, testCtx } from './stations/testkit';
 
@@ -154,8 +155,30 @@ describe('robot', () => {
     robot.create(k.ctx);
     k.group.updateMatrixWorld(true);
     const p = k.group.getObjectByName('robot-tip')!.getWorldPosition(new THREE.Vector3());
-    const railY = k.ctx.shelfSpan().y + 60;
+    const railY = k.ctx.shelfSpan().y + RAIL_BEHIND;
     expect(p.distanceTo(new THREE.Vector3(k.ctx.origin[0], railY - 20, 90))).toBeLessThan(0.5);
+  });
+  it('placing into the front tray row, the forearm and wrist stay above letter tops (older rows behind are safe)', () => {
+    const k = testCtx();
+    const span = k.ctx.shelfSpan();
+    const from = k.ctx.origin;
+    const to: [number, number, number] = [200, span.y - 9.3 - LETTER_R, span.z]; // front-row slot (letter just in front of its plank)
+    const placing = { ...job('A'), phase: 'placing' as const, progress: 0, pos: [...from] as [number, number, number] };
+    k.ctx.placing = () => [placing];
+    const inst = robot.create(k.ctx);
+    const parts = ['link-fore', 'link-wrist', 'motor-wrist'].map((n) => k.group.getObjectByName(n)!);
+    const floorOfArm = span.z + LETTER_H + 2 * LETTER_R;
+    const steps = 48; // PLACE_TIME 0.8 s at 60 fps, the director's arc
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const e = t * t * (3 - 2 * t);
+      placing.progress = t;
+      placing.pos = [from[0] + (to[0] - from[0]) * e, from[1] + (to[1] - from[1]) * e, from[2] + (to[2] - from[2]) * e + Math.sin(Math.PI * t) * PLACE_ARC];
+      inst.update(1 / 60, null, 0, null);
+      if (i % 12 !== 0) continue; // sample progress 0.25, 0.5, 0.75, 1
+      k.group.updateMatrixWorld(true);
+      for (const m of parts) expect(new THREE.Box3().setFromObject(m).min.z, `${m.name} at ${t}`).toBeGreaterThan(floorOfArm);
+    }
   });
   it('a letter job beeps its servo once; a space job is silent', () => {
     expect(runJob(robot, job('A')).k.plays).toEqual(['robot-servo']);

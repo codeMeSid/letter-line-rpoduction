@@ -63,7 +63,7 @@ describe('layoutStations', () => {
         expect(pt[a]).toBeLessThanOrEqual(r.bounds.max[a]);
       }
     }
-    expect(r.shelfOrigin).toEqual([r.bounds.min[0], r.bounds.min[1] - 160, 0]);
+    expect(r.shelfOrigin).toEqual([r.bounds.min[0], r.bounds.min[1] - 220, 0]);
     expect(r.shelfAxis).toEqual([1, 0, 0]);
   });
 

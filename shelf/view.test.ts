@@ -14,7 +14,7 @@ const handle = (): ProductHandle & { disposed: boolean; placedT: number } => {
 const job = (slotId: number, isSpace = false): Job => ({ id: slotId, slotId, char: 'a', isSpace, special: 'none', product: 'letter', stage: 'polished', phase: 'shelved', stationIndex: 6, progress: 1, pos: [0, 0, 0], defect: false, retries: 0 });
 
 describe('ShelfView', () => {
-  it('slots run +x along the front plank; new rows push older rows straight up', () => {
+  it('slots run +x along the front plank; new rows push older rows 40 back at the same height', () => {
     const shelf = new Shelf();
     const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
     const a = shelf.reserve('char', 'a');
@@ -26,10 +26,27 @@ describe('ShelfView', () => {
     shelf.newline();
     shelf.reserve('char', 'c');
     const pa2 = v.slotPos(a.slotId)!;
-    expect(pa2[2]).toBeGreaterThan(pa[2]);
-    expect(pa2[1]).toBe(pa[1]);
+    expect(pa2[2]).toBe(pa[2]);
+    expect(pa2[1]).toBe(pa[1] + 40);
   });
-  it('with 8 rows every plank and post stays in front of the robot carriage (span.y + 60 - 20)', () => {
+  it('shows the 3 newest rows: the 4th-oldest row is hidden (kept, not disposed) and gets no plank', () => {
+    const shelf = new Shelf();
+    const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
+    const hs = [0, 1, 2, 3].map((r) => {
+      if (r) shelf.newline();
+      const s = shelf.reserve('char', 'a');
+      shelf.markFilled(s.slotId);
+      const h = handle();
+      v.adopt(s.slotId, job(s.slotId), h);
+      return h;
+    });
+    v.update(1 / 60);
+    expect(hs.map((h) => h.root.visible)).toEqual([false, true, true, true]);
+    expect(hs[0].disposed).toBe(false);
+    const planks = v.group.children[0].children.filter((o) => (o as THREE.Mesh).isMesh && o.userData.role === 'wood');
+    expect(planks).toHaveLength(3);
+  });
+  it('with 8 rows every drawn plank and post stays in front of the robot carriage (span.y + 150 - 20)', () => {
     const shelf = new Shelf();
     const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
     for (let r = 0; r < 8; r++) {
@@ -39,14 +56,14 @@ describe('ShelfView', () => {
     expect(shelf.rows).toHaveLength(8);
     v.update(0);
     v.group.updateMatrixWorld(true);
-    const limit = v.span().y + 60 - 20;
+    const limit = v.span().y + 150 - 20; // robot rail at span.y + 150, carriage ±20
     let n = 0;
     v.group.traverse((o) => {
       if (!(o as THREE.Mesh).isMesh) return;
       n++;
       expect(new THREE.Box3().setFromObject(o).max.y).toBeLessThan(limit);
     });
-    expect(n).toBeGreaterThanOrEqual(8 * 4); // a plank and three posts per row
+    expect(n).toBeGreaterThanOrEqual(3 * 4); // a plank and three posts per drawn row
   });
   it('row 0 slots stand just in front of the plank (back face flush with its front face)', () => {
     const shelf = new Shelf();

@@ -8,12 +8,15 @@ import type { Shelf } from './model';
 const MARGIN = 12;   // plank overhang past the first/last slot
 const GAP_X = 8;     // between neighbouring products
 const PLANK = 4;
-const BASE = 18;     // lowest plank top above the floor
-const HEADROOM = 16;
-const BACK = 0;      // older rows stack straight up: stepping back (+y) would grow the shelf into the robot rail behind it (R22)
+const BASE = 18;     // plank top above the floor (every row)
+const ROW_PITCH = 40; // each older row steps back (+y, toward the robot) on the same level
+/** ponytail: only the newest rows are shown (older handles are hidden, kept); forklift row shipping (later plan) replaces this window. */
+const VISIBLE_ROWS = 3;
 
 /**
- * 3D typewriter shelf. The newest row is the lowest plank; older rows rise straight up (paper feed). Products sit on plank tops, reading +x. Shelved handles are owned here.
+ * 3D typewriter shelf as a flat tray (R24): the newest row is the front plank, older rows step back at the same
+ * height, so the first line still reads above later ones on screen and the robot reaches over them. Products
+ * stand on plank tops, reading +x. Shelved handles are owned here.
  */
 export class ShelfView {
   readonly group = new THREE.Group();
@@ -21,14 +24,12 @@ export class ShelfView {
   private placed = new Map<number, ProductHandle>();
   private drawnRows = -1;
   private readonly pitch: number;
-  private readonly rowH: number;
   private readonly depth: number;
 
   constructor(parent: THREE.Object3D, private shelf: Shelf, private size: Vec3, private looks: Looks, private origin: Vec3) {
     parent.add(this.group);
     this.group.add(this.planks);
     this.pitch = size[0] + GAP_X;
-    this.rowH = size[2] + HEADROOM + PLANK;
     this.depth = size[1] + 14;
   }
 
@@ -58,11 +59,11 @@ export class ShelfView {
   }
 
   bounds(): { min: Vec3; max: Vec3 } {
-    const n = Math.max(1, this.shelf.rows.length);
+    const n = this.shown();
     const [ox, oy, oz] = this.origin;
     return {
       min: [ox, oy - this.depth / 2, oz],
-      max: [ox + this.width, oy + (n - 1) * BACK + this.depth / 2, oz + BASE + (n - 1) * this.rowH + this.size[2]],
+      max: [ox + this.width, oy + (n - 1) * ROW_PITCH + this.depth / 2, oz + BASE + this.size[2]],
     };
   }
 
@@ -73,6 +74,7 @@ export class ShelfView {
     for (const [id, h] of this.placed) {
       const slot = this.shelf.getSlot(id);
       if (!slot || slot.state !== 'filled') { this.drop(h); this.placed.delete(id); continue; }
+      h.root.visible = this.level(this.shelf.slotPos(id).row) < VISIBLE_ROWS;
       const t = this.slotPos(id)!;
       const p = h.root.position;
       p.lerp(new THREE.Vector3(...t), a);
@@ -98,11 +100,14 @@ export class ShelfView {
 
   private level(row: number): number { return this.shelf.rows.length - 1 - row; }
 
+  /** Rows drawn (planks) and shown (handles): the newest VISIBLE_ROWS. */
+  private shown(): number { return Math.min(VISIBLE_ROWS, Math.max(1, this.shelf.rows.length)); }
+
   private cellPos(row: number, col: number): Vec3 {
     const L = this.level(row);
     const [ox, oy, oz] = this.origin;
     // y: the product stands just in front of the plank (its back face flush with the plank's front face), so a descender below the plank top stays visible.
-    return [ox + MARGIN + (col + 0.5) * this.pitch, oy + L * BACK - this.depth / 2 - this.size[1] / 2, oz + BASE + L * this.rowH];
+    return [ox + MARGIN + (col + 0.5) * this.pitch, oy + L * ROW_PITCH - this.depth / 2 - this.size[1] / 2, oz + BASE];
   }
 
   private clearPlanks(): void {
@@ -112,11 +117,11 @@ export class ShelfView {
 
   private drawPlanks(): void {
     this.clearPlanks();
-    const n = Math.max(1, this.shelf.rows.length);
+    const n = this.shown();
     const [ox, oy, oz] = this.origin;
+    const top = oz + BASE;
     for (let L = 0; L < n; L++) {
-      const y = oy + L * BACK;
-      const top = oz + BASE + L * this.rowH;
+      const y = oy + L * ROW_PITCH;
       const plank = housing(this.looks, this.width, this.depth, PLANK, 'wood', 1);
       plank.position.set(ox + this.width / 2, y, top - PLANK);
       this.planks.add(plank);
@@ -125,10 +130,10 @@ export class ShelfView {
         post.position.set(x, y + this.depth / 2 - 3, oz);
         this.planks.add(post);
       }
+      const foot = box(this.looks, this.width, 6, 3, 'steel');
+      foot.position.set(ox + this.width / 2, y + this.depth / 2 - 3, oz);
+      this.planks.add(foot);
     }
-    const foot = box(this.looks, this.width, 6, 3, 'steel');
-    foot.position.set(ox + this.width / 2, oy + this.depth / 2 - 3, oz);
-    this.planks.add(foot);
     this.drawnRows = this.shelf.rows.length;
   }
 }

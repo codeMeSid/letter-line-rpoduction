@@ -5,7 +5,7 @@ export const PER_ROW = 5;
 export const ROW_EXTRA = 120;
 export const FLOOR_STEP = 140;
 export const RETURN_Y = 80;
-export const SHELF_FRONT = 160;
+export const SHELF_FRONT = 220; // room for the robot rail between the front stations and the shelf tray (R24)
 
 export interface LayoutDef { footprint: [number, number]; height: number }
 
