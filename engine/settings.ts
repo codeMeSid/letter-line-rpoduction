@@ -29,7 +29,7 @@ export interface Settings {
 
 export const defaultSettings: Settings = {
   product: 'letter',
-  look: 'realistic',
+  look: 'flat',
   pace: 'auto',
   quality: 'high',
   layout: 'snake',

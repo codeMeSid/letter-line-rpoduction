@@ -8,7 +8,7 @@ describe('settings store', () => {
     const { set: _set, ...s } = settingsStore.getState();
     expect(s).toEqual(defaultSettings);
     expect(defaultSettings).toMatchObject({
-      product: 'letter', look: 'realistic', pace: 'auto', quality: 'high', sound: false, layout: 'snake', colorMode: 'accent', theme: 'dark', backspaceStyle: 'closeup',
+      product: 'letter', look: 'flat', pace: 'auto', quality: 'high', sound: false, layout: 'snake', colorMode: 'accent', theme: 'dark', backspaceStyle: 'closeup',
       inflightBackspace: 'reject', camera: 'overview', defectRate: 0.06, volume: 0.6, forklift: false, hudOpen: false,
     });
     expect(defaultSettings.letterMarks).toEqual({ emboss: true, label: true, cap: false, shape: false });
