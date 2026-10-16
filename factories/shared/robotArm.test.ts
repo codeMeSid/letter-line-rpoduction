@@ -1,0 +1,22 @@
+import * as THREE from 'three';
+import { describe, expect, it } from 'vitest';
+import { Looks } from '../../engine/looks';
+import { RobotArm } from './robotArm';
+import type { Vec3 } from '../../engine/types';
+
+describe('RobotArm', () => {
+  it('gripper tip reaches reachable targets (hierarchy signs match the IK)', () => {
+    const arm = new RobotArm(new Looks({ look: 'realistic', theme: 'dark', colorMode: 'accent', quality: 'high' }));
+    const targets: Vec3[] = [[120, 0, 40], [0, -100, 30], [-80, 60, 120], [60, 60, 10]];
+    for (const t of targets) {
+      for (let i = 0; i < 200; i++) arm.reach(t, 1 / 30, 30);
+      arm.group.updateMatrixWorld(true);
+      const p = arm.tip.getWorldPosition(new THREE.Vector3());
+      expect(p.distanceTo(new THREE.Vector3(...t)), `${t}`).toBeLessThan(0.5);
+    }
+  });
+  it('reports unreachable targets', () => {
+    const arm = new RobotArm(new Looks({ look: 'realistic', theme: 'dark', colorMode: 'accent', quality: 'high' }));
+    expect(arm.reach([900, 0, 0], 1 / 30)).toBe(false);
+  });
+});

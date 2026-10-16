@@ -82,7 +82,10 @@ uses relative imports (vitest has no alias).
   `samples.ts` (`SampleProvider` stub, empty `SAMPLE_URLS`), `fakeContext.ts` (fake Web Audio for node tests only).
   Dev aid: `/dev/sound` page (hidden, 404 in production) auditions every sound/loop and has an offline-render level check.
   Providers' `play` returns a `VoiceHandle` so the bus can count/stop voices.
-- `factories/` — one folder per product + `shared/` parts and robot arm
+- `factories/` — one folder per product + `shared/`: `dims` (`BELT_TOP`, `BELT_W`), `ik`, `parts` (`housing`/`box`/`column`/`beam`/`pipe`/`lathe`
+  + `flange`/`piston`/`gear`/`gauge`/`lamp`/`panel`/`hazardBand`/`railing`/`legs`; z-up, bottom at z=0, centred on x/y; `merged`, `disposeTree`),
+  `conveyor` (`buildConveyor(looks, path, opts)` → `{group, update(simDt, speed), dispose()}`; belt scroll itself is `Looks.scrollBelts`),
+  `robotArm` (`RobotArm`: `reach`/`grip`/`tip`/`dispose`). Bench views: `/dev/bench` buttons `view: swatches|line|machine|detail`
 - `fx/` — shotgun, chute, broom, forklift, workers, day/night
 - `hud/` — React HUD + gauges
 - `components/Scene.tsx` — client entry mounting everything (Task 1: placeholder single prism)
