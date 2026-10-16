@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { letterGeometry } from '../../engine/letterSolid';
 import type { StationDef } from '../../engine/station';
 import { BELT_W } from '../shared/dims';
-import { LETTER_H, LETTER_R } from './product';
+import { LETTER_H, LETTER_R, PALLET_T } from './product';
 import { cooling } from './stations/cooling';
 import { grinder } from './stations/grinder';
 import { moulder } from './stations/moulder';
@@ -147,6 +147,15 @@ describe('robot', () => {
     k.group.updateMatrixWorld(true);
     const p = k.group.getObjectByName('robot-tip')!.getWorldPosition(new THREE.Vector3());
     expect(Math.hypot(p.x - 200, p.y + 300)).toBeLessThan(25);
+    expect(Math.abs(p.z - (60 + PALLET_T + 2 * LETTER_R + 2))).toBeLessThan(25); // progress 0: grip just above the flat letter
+  });
+  it('starts in its idle pose (tip at carriage x, rail y - 20, z 90) instead of swinging in from the arm default', () => {
+    const k = testCtx();
+    robot.create(k.ctx);
+    k.group.updateMatrixWorld(true);
+    const p = k.group.getObjectByName('robot-tip')!.getWorldPosition(new THREE.Vector3());
+    const railY = k.ctx.shelfSpan().y + 60;
+    expect(p.distanceTo(new THREE.Vector3(k.ctx.origin[0], railY - 20, 90))).toBeLessThan(0.5);
   });
   it('a letter job beeps its servo once; a space job is silent', () => {
     expect(runJob(robot, job('A')).k.plays).toEqual(['robot-servo']);

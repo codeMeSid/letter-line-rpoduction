@@ -24,6 +24,9 @@ const UPRIGHT_GRIP = LETTER_H + 2 * LETTER_R;
 const CARRY_RATE = 40;
 const CARRY_ARM_RATE = 60;
 
+/** Idle tip: over the carriage, 20 toward the shelf, at world z 90. */
+const REST = [0, -20, 90] as const;
+
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /**
@@ -101,7 +104,7 @@ export const robot: StationDef = {
           closed = ss(0.7, 0.9, t);
           goal = job.pos[0];
         } else {
-          target = [cx, railY - 20, 90];
+          target = [cx, railY + REST[1], REST[2]];
         }
         cx = ease(cx, clampX(goal), dt, rate);
         carriage.position.x = cx - ox;
@@ -116,6 +119,7 @@ export const robot: StationDef = {
         teardown(group);
       },
     };
+    arm.reach([0, REST[1], REST[2] - (oz + BASE_Z)], 1, Infinity); // snap to the idle pose (no swing in from the arm's default)
     inst.update(0, null, 0, null); // initial pose
     return inst;
   },

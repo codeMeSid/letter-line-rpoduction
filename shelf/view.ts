@@ -10,11 +10,10 @@ const GAP_X = 8;     // between neighbouring products
 const PLANK = 4;
 const BASE = 18;     // lowest plank top above the floor
 const HEADROOM = 16;
-const BACK = 14;     // each older (higher) row steps back (+y)
+const BACK = 0;      // older rows stack straight up: stepping back (+y) would grow the shelf into the robot rail behind it (R22)
 
 /**
- * 3D typewriter shelf. The newest row is the front, lowest plank; older rows rise and step back
- * (paper feed). Products sit on plank tops, reading +x. Shelved handles are owned here.
+ * 3D typewriter shelf. The newest row is the lowest plank; older rows rise straight up (paper feed). Products sit on plank tops, reading +x. Shelved handles are owned here.
  */
 export class ShelfView {
   readonly group = new THREE.Group();

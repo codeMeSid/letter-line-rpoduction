@@ -14,7 +14,7 @@ const handle = (): ProductHandle & { disposed: boolean; placedT: number } => {
 const job = (slotId: number, isSpace = false): Job => ({ id: slotId, slotId, char: 'a', isSpace, special: 'none', product: 'letter', stage: 'polished', phase: 'shelved', stationIndex: 6, progress: 1, pos: [0, 0, 0], defect: false, retries: 0 });
 
 describe('ShelfView', () => {
-  it('slots run +x along the front plank; new rows push older rows up and back', () => {
+  it('slots run +x along the front plank; new rows push older rows straight up', () => {
     const shelf = new Shelf();
     const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
     const a = shelf.reserve('char', 'a');
@@ -27,7 +27,26 @@ describe('ShelfView', () => {
     shelf.reserve('char', 'c');
     const pa2 = v.slotPos(a.slotId)!;
     expect(pa2[2]).toBeGreaterThan(pa[2]);
-    expect(pa2[1]).toBeGreaterThan(pa[1]);
+    expect(pa2[1]).toBe(pa[1]);
+  });
+  it('with 8 rows every plank and post stays in front of the robot carriage (span.y + 60 - 20)', () => {
+    const shelf = new Shelf();
+    const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
+    for (let r = 0; r < 8; r++) {
+      if (r) shelf.newline();
+      shelf.reserve('char', 'a');
+    }
+    expect(shelf.rows).toHaveLength(8);
+    v.update(0);
+    v.group.updateMatrixWorld(true);
+    const limit = v.span().y + 60 - 20;
+    let n = 0;
+    v.group.traverse((o) => {
+      if (!(o as THREE.Mesh).isMesh) return;
+      n++;
+      expect(new THREE.Box3().setFromObject(o).max.y).toBeLessThan(limit);
+    });
+    expect(n).toBeGreaterThanOrEqual(8 * 4); // a plank and three posts per row
   });
   it('row 0 slots stand just in front of the plank (back face flush with its front face)', () => {
     const shelf = new Shelf();

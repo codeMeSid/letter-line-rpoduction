@@ -7,7 +7,11 @@ import type { Settings } from './settings';
 import type { Job, Vec3 } from './types';
 
 export interface StationCtx {
-  /** Station root, already positioned at `origin`. Build in local coords: z=0 = belt top, floor at z=-BELT_TOP. */
+  /**
+   * Station root, already positioned at `origin`. Build in local coords: z=0 = belt top, floor at z=-BELT_TOP.
+   * The host tags every mesh `userData.cut` (sliced by the cutaway look) after create(); set `userData.cut = false`
+   * on meshes that must stay whole (e.g. the robot rig in front of the line).
+   */
   group: THREE.Group;
   origin: Vec3;
   looks: Looks;

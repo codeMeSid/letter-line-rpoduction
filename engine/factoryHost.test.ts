@@ -42,7 +42,10 @@ function setup(look: LookOptions['look'] = 'realistic') {
     id, label: id, footprint: [90, 90], height: 60, duration: 0.5, outputStage: out,
     create: (ctx) => {
       const mesh = ctx.looks.part(new THREE.BoxGeometry(10, 10, 10), 'steel');
-      ctx.group.add(mesh);
+      const whole = ctx.looks.part(new THREE.BoxGeometry(4, 4, 4), 'steel');
+      whole.name = 'whole';
+      whole.userData.cut = false; // opted out of the cutaway slice
+      ctx.group.add(mesh, whole);
       const i: RecInst = {
         seen: [], got: [], begun: [], mesh, destroyed: false, restyled: 0,
         begin(job, p) { i.begun.push({ job, product: p, at: p ? p.root.position.toArray() : null, jobAt: [...job.pos] }); },
@@ -226,6 +229,24 @@ describe('FactoryHost', () => {
       f.looks.apply(f.parent);
       for (const inst of f.insts) expect(clip(inst.mesh)![0]).toBe(f.looks.cutPlane);
       for (const m of meshes(f.host.shelfView.group.children[0])) expect(clip(m)).toBeNull();
+    });
+    it('a station mesh with userData.cut = false stays whole after build and after a look switch', () => {
+      const f = setup('cutaway');
+      const wholes = meshes(f.host.root).filter((m) => m.name === 'whole');
+      expect(wholes).toHaveLength(f.insts.length);
+      for (const m of wholes) {
+        expect(m.userData.cut).toBe(false);
+        expect(clip(m)).toBeNull();
+      }
+      for (const look of ['realistic', 'cutaway'] as const) {
+        f.looks.set({ ...lookOpts, look });
+        f.looks.apply(f.parent);
+        for (const m of wholes) {
+          expect(m.userData.cut).toBe(false);
+          expect(clip(m)).toBeNull();
+        }
+      }
+      for (const inst of f.insts) expect(clip(inst.mesh)![0]).toBe(f.looks.cutPlane); // the positive control is still cut
     });
     it('relayout re-tags the rebuilt stations', () => {
       const f = setup('cutaway');
