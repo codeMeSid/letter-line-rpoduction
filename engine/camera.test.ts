@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { CameraRig, FOV, fitView, viewDir } from './camera';
 import { LOOKS, type Vec3 } from './types';
 
+const TAN = Math.tan((FOV * Math.PI) / 360);
+
 const corners = (min: Vec3, max: Vec3) => {
   const out: THREE.Vector3[] = [];
   for (const x of [min[0], max[0]]) for (const y of [min[1], max[1]]) for (const z of [min[2], max[2]]) out.push(new THREE.Vector3(x, y, z));
@@ -63,6 +65,28 @@ describe('CameraRig', () => {
     newest = [100, -100, 22];
     for (let i = 0; i < 300; i++) rig.update(1 / 60, 5000 + i * 16);
     expect(rig.center().x).toBeCloseTo(100, 0);
+  });
+  it('keeps the on-screen scale continuous across look switches (no update between)', () => {
+    const rig = new CameraRig({ overview: () => ({ min: [0, -300, 0], max: [900, 0, 120] }), newest: () => null, busiest: () => null, followSpan: () => 400 });
+    rig.resize(1280, 720, 2);
+    rig.snap();
+    // pointScale() feeds the particle shader, which divides by view depth in perspective only, so the
+    // comparable quantity is pixels per world unit at the target plane (persp: pointScale / distance = pointScale * tan * aspect / halfWidth).
+    const state = () => {
+      const { halfWidth } = rig.center();
+      const aspect = 1280 / 720;
+      const px = rig.isOrtho() ? rig.pointScale() : (rig.pointScale() * TAN * aspect) / halfWidth;
+      return { halfWidth, px };
+    };
+    const near = (a: number, b: number) => expect(Math.abs(a - b) / Math.abs(b)).toBeLessThan(1e-6);
+    let before = state();
+    for (const look of ['flat', 'realistic', 'cutaway', 'lineart'] as const) {
+      rig.setLook(look);
+      const after = state();
+      near(after.halfWidth, before.halfWidth);
+      near(after.px, before.px);
+      before = after;
+    }
   });
   it('switches projection with the look', () => {
     const rig = new CameraRig({ overview: () => ({ min: [0, 0, 0], max: [100, 100, 100] }), newest: () => null, busiest: () => null, followSpan: () => 400 });

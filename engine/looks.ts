@@ -32,6 +32,8 @@ const SPEC: Record<MaterialRole, RoleSpec> = {
 /** Roles recoloured in colorMode 'mono'. */
 const MONO: Partial<Record<MaterialRole, number>> = { 'paint-accent': SPEC.paint.color, copper: SPEC.steel.color };
 const HOT = new Set<MaterialRole>(['molten', 'glow']);
+/** Glow colour multiplier in the lit looks (bloom input). */
+const GLOW_HDR = 2.5;
 
 const BG: Record<Look, Record<'light' | 'dark', number>> = {
   realistic: { dark: 0x0d0f12, light: 0xdcdfe3 },
@@ -160,7 +162,13 @@ export class Looks {
     if (look === 'lineart') {
       return new THREE.MeshBasicMaterial({ color: HOT.has(role) ? color : this.background(), toneMapped: false });
     }
-    if (s.basic) return new THREE.MeshBasicMaterial({ color, toneMapped: false });
+    if (s.basic) {
+      // Lit looks go through the bloom chain: glow is HDR (x2.5) so it clears the 0.9 bloom threshold after ACES.
+      const lit = look === 'realistic' || look === 'cutaway';
+      const m = new THREE.MeshBasicMaterial({ color: lit ? color.multiplyScalar(GLOW_HDR) : color, toneMapped: false });
+      if (look === 'cutaway') m.side = THREE.DoubleSide; // clipped glow parts must not vanish
+      return m;
+    }
     if (look === 'flat') {
       return new THREE.MeshToonMaterial({
         color, map, gradientMap: ramp(),

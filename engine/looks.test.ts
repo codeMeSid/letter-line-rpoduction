@@ -45,6 +45,22 @@ describe('Looks', () => {
     expect((la.material('steel') as THREE.MeshBasicMaterial).color.equals(bg)).toBe(true);
     expect((la.material('molten') as THREE.MeshBasicMaterial).color.equals(bg)).toBe(false);
   });
+  it('glow is HDR (max channel > 1) in realistic/cutaway so it clears the bloom threshold; flat and lineart stay <= 1', () => {
+    const max = (look: LookOptions['look']) => {
+      const c = (new Looks({ ...base, look }).material('glow') as THREE.MeshBasicMaterial).color;
+      return Math.max(c.r, c.g, c.b);
+    };
+    expect(max('realistic')).toBeGreaterThan(1);
+    expect(max('cutaway')).toBeGreaterThan(1);
+    expect(max('flat')).toBeLessThanOrEqual(1);
+    expect(max('lineart')).toBeLessThanOrEqual(1);
+  });
+  it('cutaway glow (basic material) is double-sided so clipped parts do not vanish', () => {
+    const c = new Looks({ ...base, look: 'cutaway' });
+    expect(c.material('glow')).toBeInstanceOf(THREE.MeshBasicMaterial);
+    expect(c.material('glow').side).toBe(THREE.DoubleSide);
+    expect(new Looks({ ...base, look: 'realistic' }).material('glow').side).toBe(THREE.FrontSide);
+  });
   it('mono maps paint-accent to the paint colour', () => {
     const l = new Looks({ ...base, colorMode: 'mono' });
     const a = l.material('paint-accent') as THREE.MeshStandardMaterial;
