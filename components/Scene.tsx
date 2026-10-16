@@ -6,7 +6,7 @@ import { AudioBus } from '@/audio/bus';
 import { CameraRig, type CameraMode } from '@/engine/camera';
 import { Director } from '@/engine/director';
 import { FactoryHost } from '@/engine/factoryHost';
-import { keyToCommand } from '@/engine/input';
+import { keyRoute, keyToCommand } from '@/engine/input';
 import { CONVEYOR_SPEED } from '@/engine/line';
 import { createLoop } from '@/engine/loop';
 import { Looks, type LookOptions } from '@/engine/looks';
@@ -123,12 +123,17 @@ export default function Scene() {
 
     const onKey = (e: KeyboardEvent) => {
       audio.unlock();
-      if (e.key === 'Escape') {
+      const t = e.target instanceof HTMLElement ? e.target : null;
+      const route = keyRoute(e.key, settings().hudOpen, t);
+      if (route === 'hud') {
         settings().set({ hudOpen: !settings().hudOpen });
         return;
       }
-      if ((e.target as Element | null)?.closest?.('.hud, .hud-toggle')) return; // keys on a HUD control stay with the control
-      const cmd = keyToCommand({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, repeat: e.repeat, target: e.target as Element | null });
+      if (route === 'block') e.preventDefault();
+      if (route !== 'factory') return;
+      const onHud = !!t?.closest('.hud, .hud-toggle');
+      if (onHud) t!.blur(); // a HUD control that kept focus must not swallow typing
+      const cmd = keyToCommand({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, repeat: e.repeat, target: onHud ? null : t });
       if (!cmd) return;
       e.preventDefault();
       director.handle(cmd);

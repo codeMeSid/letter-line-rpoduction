@@ -4,8 +4,11 @@ import type { Command } from './types';
 /** DOM-free shape of `KeyboardEvent.target` (an Element in the browser). */
 export interface KeyTargetLike {
   tagName?: string;
+  /** an <input>'s type */
+  type?: string;
   isContentEditable?: boolean;
   getAttribute?(name: string): string | null;
+  closest?(selectors: string): unknown;
 }
 
 export interface KeyEventLike {
@@ -40,4 +43,19 @@ export function keyToCommand(e: KeyEventLike): Command | null {
     default:
       return isPrintable(e.key) ? { type: 'char', char: e.key } : null;
   }
+}
+
+/**
+ * What a keydown does on the factory page: 'hud' toggles the HUD, 'block' swallows it, 'control' leaves
+ * it to the focused HUD control, 'factory' types (the caller blurs a HUD control first). Tab only moves
+ * focus inside the open HUD; a HUD control never swallows printable typing unless it is a text/range input.
+ */
+export function keyRoute(key: string, hudOpen: boolean, t: KeyTargetLike | null | undefined): 'hud' | 'block' | 'control' | 'factory' {
+  if (key === 'Escape') return 'hud';
+  if (key === 'Tab') return hudOpen ? 'control' : 'block';
+  if (t?.closest?.('.hud-toggle')) return key === ' ' || key === 'Enter' ? 'control' : 'factory';
+  if (!t?.closest?.('.hud')) return 'factory';
+  const tag = t.tagName?.toUpperCase();
+  if (tag === 'TEXTAREA' || (tag === 'INPUT' && t.type !== 'checkbox')) return 'control';
+  return isPrintable(key) ? 'factory' : 'control';
 }
