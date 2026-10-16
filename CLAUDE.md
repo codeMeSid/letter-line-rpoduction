@@ -6,9 +6,10 @@ Read this first in every new session.
 
 A full-page Next.js app: every typed character runs an animated 3D factory (Three.js, four looks:
 realistic, line-art, flat iso, cutaway) whose real procedural machines visibly turn raw material into
-a product that is or bears that character, then shelve it like a typewriter. Space = empty slot, Backspace = shotgun / reject chute, Enter = new row
-(or forklift ships the row). Product factories: cast metal letter
-(first), glass bottle, can, mug, cookie, neon, toy brick. Procedural sound (default off), collapsible HUD.
+a product that is or bears that character, then shelve it like a typewriter. Space = empty slot, Backspace = remove the
+last slot (shotgun / reject chute visuals are a later plan), Enter = new row (forklift row shipping later).
+Product factories: cast metal letter (landed, Tasks 5–12), then glass bottle, can, mug, cookie, neon, toy brick.
+Procedural sound (default off), collapsible HUD.
 **User bar:** real machinery, the product visibly taking shape — never placeholder boxes.
 
 ## Where things are
@@ -62,25 +63,26 @@ uses relative imports (vitest has no alias).
   `globals.css` (reset, `.stage` full-viewport canvas host, `.hud*` panel, `.bench-*` overlay), `dev/bench` (→ `components/Bench.tsx`: a swatch per material role, look/theme/quality buttons, spark+sand emitter; add `ROWS` entries) + `dev/sound` (both 404 in production)
 - `engine/` — pure & unit-tested (no DOM): `types`, `charset`, `settings` (zustand store + `useSettings`), `clock` (WPM/speedMul),
   `events` (typed emitter), `layout` (`layoutStations`: anchors/paths per mode, footprints centred on anchors),
-  `line` (`Line` pipeline; `decide` injected; jobs leave as `placing`/`rejected`; phase callbacks flush after each tick; `remove()` → `destroyed`), `input` (`keyToCommand`),
+  `line` (`Line` pipeline; `decide` injected; jobs leave as `placing`/`rejected`; phase callbacks flush after each tick; `remove()` → `destroyed`; hand-offs keep `minGap`: a belt head stops short of a busy station or the job that just left it, and a station takes a job only once its outbound tail is `minGap` away; jobs leaving as `placing` this tick still count against `maxInFlight`), `input` (`keyToCommand`; `keyRoute(key, hudOpen, target)` → hud | block | control | factory),
   `station`/`product`/`factory` (Task 9 contracts: StationCtx/Def/Instance, ProductHandle/Model, FactoryDef),
   `glyphs` (`GLYPHS`/`glyph(ch)`: single-stroke set, cell u 0..0.7 × v 0..1 v-down, caps/digits 0..0.8, x-line .25, baseline .8, descender 1; unknown → `?`),
   `surface` (`flatSurface`/`cylinderSurface`/`topSurface` map normalised cell (u,v) → world Vec3, `FRONT_ANGLE` = −y; no SVG/culling; surface u 0..1 ↔ glyph u 0..0.7),
   `particles` (pure sim; buffers public read-only, `specOf(kindIndex)`, `ColorKey`).
-  Three runtime (Task 6): `looks` (`Looks`: role → shared material per look; `own(role)` for per-instance; `apply`/`appearance`; background/edge/particle colours; belt texture; cutaway clips per object: meshes with `userData.cut` get `material(role, true)` = clipped by `looks.cutPlane`, the host tags station + conveyor meshes only, `own()` materials are not clipped),
+  Three runtime (Task 6): `looks` (`Looks`: role → shared material per look; `own(role)` for per-instance; `apply`/`appearance`; background/edge/particle colours; belt texture; cutaway clips per object: meshes with `userData.cut` get `material(role, true)` = clipped by `looks.cutPlane` (`clipShadows` on), the host tags station + conveyor meshes only, `own()` materials are not clipped),
   `renderer` (`createRenderer(root, quality)`: one WebGL canvas), `stage` (`createStage`: lights, env map, tone mapping per look, `fitShadow`),
   `loop` (`createLoop(speedMul, env?)`: the single rAF; dt clamped to `MAX_DT`, sleeps when hidden/idle, `wake()`),
   `particlesView` (`ParticlesView`: normal + additive `THREE.Points` on `PARTICLE_LAYER`; the camera must enable that layer),
-  `camera` (`CameraRig`: persp for realistic/line-art, ortho for flat/cutaway; overview/follow/cinematic; OrbitControls yields 4 s after the user), `post` (`createPost`: composer chain per look/quality) + `edgePass`,
-  `director` (`Director`: routes commands, owns one `Shelf` per kind, events) + `pace`,
-  `factoryHost` (`FactoryHost(def, origin, deps, mode)`: mounts one `FactoryDef` — floor, conveyors, stations, `Line`, one `ProductHandle` per in-flight job (queued = hidden, backspaced = disposed), `relayout(mode)`/`restyle()`; shelved handles are handed to `ShelfView`)
+  `camera` (`CameraRig`: persp for realistic/line-art, ortho for flat/cutaway; overview/follow/cinematic; OrbitControls yields 4 s after the user; rig target handed to the controls on 'start' only, so pans stick; polar angle < π/2, dolly 60..10000, ortho half-height 30..4000), `post` (`createPost`: composer chain per look/quality) + `edgePass`,
+  `director` (`Director`: routes commands, owns one `Shelf` per kind, events; placing jobs count against the pace's `maxInFlight`) + `pace`,
+  `factoryHost` (`FactoryHost(def, origin, deps, mode)`: mounts one `FactoryDef` — floor, conveyors, stations, `Line`, one `ProductHandle` per in-flight job (queued = hidden, backspaced = disposed), `relayout(mode)`/`restyle()`; `newest()` = newest non-queued line job, the placing job only when the line is empty; shelved handles are handed to `ShelfView`)
 - `shelf/` — `model.ts` pure `Shelf` (lazy auto-wrap at 14, per-row `endedByNewline`, `removeNewline`; `peekLast` → slot | newline | busy | null)
-  + `view.ts` `ShelfView` (3D typewriter shelf: newest row = front, lowest plank; older rows rise +z / step back +y; `slotPos`/`span`/`adopt`/`bounds`; owns shelved handles, damps them to their slot, disposes on removal)
+  + `view.ts` `ShelfView` (R24: flat tray in front of the line, `SHELF_FRONT` 220; only the 3 newest rows are shown (`VISIBLE_ROWS`), newest = front plank,
+  older rows step back +y on the same level toward the robot rail behind; `slotPos`/`span`/`adopt`/`bounds`; owns shelved handles, damps them to their slot, disposes on removal)
 - `audio/` — `types` (binding `SOUND_NAMES`/`SoundName`, `LOOP_NAMES`, `AudioProvider`, `LoopHandle`, `VoiceHandle`),
   `bus` (`AudioBus`: lazy ctx on `unlock()`, `setVolume`/`setEnabled` (master = volume², 0 when off; mute stops loop sources and
   restarts them on unmute), `setListener(xCenter, halfWidth)` +
   `play(name, {x|pan, gain, rate})`, per-name throttle 40ms (key-clack 15), 24-voice cap drops oldest (sources actually `stop()`),
-  loops queued until unlock; takes no settings import — Task 5 wires the store), `synth/` (active procedural provider `SynthProvider`;
+  loops queued until unlock; takes no settings import — `components/Scene.tsx` feeds it `volume`/`sound` from the store), `synth/` (active procedural provider `SynthProvider`;
   `voice.ts` = Voice helper; sources are not pre-stopped so cap/halt can `src.stop()` once, then the whole graph disconnects;
   `tone()`/`burst()`/raw oscillators+noise; one file per sound family; `loops.ts`; `noise.ts` crossfaded seamless noise buffers),
   `samples.ts` (`SampleProvider` stub, empty `SAMPLE_URLS`), `fakeContext.ts` (fake Web Audio for node tests only).
@@ -89,13 +91,13 @@ uses relative imports (vitest has no alias).
 - `factories/` — one folder per product + `shared/`: `dims` (`BELT_TOP`, `BELT_W`), `ik`, `parts` (`housing`/`box`/`column`/`beam`/`pipe`/`lathe`
   + `flange`/`piston`/`gear`/`gauge`/`lamp`/`panel`/`hazardBand`/`railing`/`legs`; z-up, bottom at z=0, centred on x/y; `merged`, `disposeTree`),
   `conveyor` (`buildConveyor(looks, path, opts)` → `{group, update(simDt, speed), dispose()}`; belt scroll itself is `Looks.scrollBelts`),
-  `robotArm` (`RobotArm`: `reach`/`grip`/`tip`/`dispose`). Bench views: `/dev/bench` buttons `view: swatches|line|machine|detail`|letter`.
+  `robotArm` (`RobotArm`: `reach`/`grip`/`tip`/`dispose`). Bench views: `/dev/bench` buttons `view: swatches|line|machine|detail|letter`.
   `letter/`: `visual.ts` (pure `letterVisual(stage, t)`, `LETTER_STAGES`) + `product.ts` (`letterProduct`: flask/sand/cavity/molten metal clipped by a world fill plane,
   sprue + flash (flash is only attached to the `letter` group while shown), `place()` stands it upright; `PALLET_T`, `SAND_TOP`, `LETTER_H/R`). `view: letter` has a stage scrubber + char box.
-  `letter/stations/`: one file per station (`moulder`, `pour`, `cooling`, `shakeout`; Task 12 adds 5–7) + `common.ts` (`FLOOR`, `ss`, `ease`, `stationBase`,
+  `letter/stations/`: one file per station (`moulder`, `pour`, `cooling`, `shakeout`, `grinder`, `polish`, `robot` = rail robot that places onto the shelf) + `common.ts` (`FLOOR`, `ss`, `ease`, `stationBase`,
   `helix`, `world`/`floorZ` for world-space particles, `teardown(group, keep)`, `oneShots()`) + `testkit.ts` (tests only). Stations build every mesh
   in `create()` with `looks.part`/parts kit (R16: never `own()`); later frames only move/show/swap geometry. `view: stations|moulder|pour|cooling|shakeout`
   runs each station on a looping fake job with a freeze-at-t slider; those views cut per object like the real Scene.
-- `fx/` — shotgun, chute, broom, forklift, workers, day/night
-- `hud/` — `Hud.tsx` minimal settings panel (look/pace/camera/theme/quality/sound; Escape or gear toggles; styles `.hud*` in `globals.css`). Gauges later
-- `components/Scene.tsx` — client entry: renderer, looks, stage, post, rig, one `FactoryHost` per registered kind (`factories/registry.ts`: `FACTORIES`, `factoryOrigin`), director, the single loop, key routing, settings subscription (`applyLook` = `looks.set` then `looks.apply(scene)` + host restyle; cutaway forces `pan` layout + clip plane)
+- `fx/` — (not yet created; later plans) shotgun, chute, broom, forklift, workers, day/night
+- `hud/` — `Hud.tsx` minimal settings panel (look/pace/camera/theme/quality/sound; Escape or gear toggles; Tab moves between controls only while open; styles `.hud*` in `globals.css`). Gauges later
+- `components/Scene.tsx` — client entry: renderer, looks, stage, post, rig, one `FactoryHost` per registered kind (`factories/registry.ts`: `FACTORIES`, `factoryOrigin`), director, the single loop, key routing (`keyRoute`; a HUD control is blurred when printable typing goes to the factory), settings subscription (`applyLook` = `looks.set` then `looks.apply(scene)` + host restyle; cutaway forces `pan` layout + clip plane)

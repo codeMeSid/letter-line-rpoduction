@@ -80,7 +80,6 @@ Format: `Ruling: <what> — <why> — <cost if wrong>`
 - vitest has no `@/` alias; tests import by relative path.
 - Line drops a pending event if its job changed phase before flush (only happens for jobs removed by a callback).
 
-- `HL.tset(tw, to, now, delay)` requires `delay` (pass 0); omitting it yields NaN.
 - TypeScript pinned to 5.9 (Next 15 needs the JS compiler API).
 
 ## Deferred minor findings
