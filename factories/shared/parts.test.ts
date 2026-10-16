@@ -38,6 +38,19 @@ describe('parts', () => {
     l.set(false);
     expect(mesh.userData.role).toBe('rubber');
   });
+  it('a cut-tagged lamp stays clipped when it swaps role in cutaway', () => {
+    const cl = new Looks({ look: 'cutaway', theme: 'dark', colorMode: 'accent', quality: 'high' });
+    const l = lamp(cl, 2);
+    const mesh = l.group.children[0] as THREE.Mesh;
+    mesh.userData.cut = true;
+    l.set(true);
+    expect((mesh.material as THREE.Material).clippingPlanes![0]).toBe(cl.cutPlane);
+    l.set(false);
+    expect((mesh.material as THREE.Material).clippingPlanes![0]).toBe(cl.cutPlane);
+    const plain = lamp(cl, 2);
+    plain.set(true);
+    expect(((plain.group.children[0] as THREE.Mesh).material as THREE.Material).clippingPlanes).toBeNull();
+  });
   it('gauge needle rotates with value', () => {
     const g = gauge(looks, 6);
     g.set(0);

@@ -68,6 +68,56 @@ describe('Looks', () => {
       expect(m.map, look).not.toBeNull();
     }
   });
+  describe('cut tag (per-object cutaway clipping)', () => {
+    const clip = (m: THREE.Mesh) => (m.material as THREE.Material).clippingPlanes;
+    const pair = (l: Looks) => {
+      const cut = l.part(new THREE.BoxGeometry(1, 1, 1), 'steel');
+      cut.userData.cut = true;
+      const plain = l.part(new THREE.BoxGeometry(1, 1, 1), 'steel');
+      const root = new THREE.Group().add(cut, plain);
+      l.apply(root);
+      return { cut, plain, root };
+    };
+    it('in cutaway a cut-tagged mesh is clipped by cutPlane; an untagged mesh is never clipped', () => {
+      const l = new Looks({ ...base, look: 'cutaway' });
+      const { cut, plain } = pair(l);
+      expect(clip(cut)).toHaveLength(1);
+      expect(clip(cut)![0]).toBe(l.cutPlane);
+      expect(clip(plain)).toBeNull();
+      expect(cut.material).not.toBe(plain.material);
+      expect(l.material('steel', true)).toBe(cut.material); // clipped variants are shared too
+      expect(l.cutPlane.normal.toArray()).toEqual([0, 1, 0]);
+    });
+    it('outside cutaway nothing is clipped and the cut tag shares the normal material', () => {
+      for (const look of ['realistic', 'lineart', 'flat'] as const) {
+        const l = new Looks({ ...base, look });
+        const { cut, plain } = pair(l);
+        expect(clip(cut), look).toBeNull();
+        expect(cut.material, look).toBe(plain.material);
+      }
+    });
+    it('switching look away from and back to cutaway re-picks the variant on apply', () => {
+      const l = new Looks({ ...base, look: 'cutaway' });
+      const { cut, plain, root } = pair(l);
+      l.set({ ...base, look: 'realistic' });
+      l.apply(root);
+      expect(clip(cut)).toBeNull();
+      expect(cut.material).toBe(plain.material);
+      l.set({ ...base, look: 'cutaway' });
+      l.apply(root);
+      expect(clip(cut)![0]).toBe(l.cutPlane);
+      expect(clip(plain)).toBeNull();
+    });
+    it('set() disposes the clipped variants too', () => {
+      const l = new Looks({ ...base, look: 'cutaway' });
+      let disposed = 0;
+      const m = l.material('steel', true);
+      m.addEventListener('dispose', () => disposed++);
+      l.set({ ...base, look: 'cutaway' });
+      expect(disposed).toBe(1);
+      expect(l.material('steel', true)).not.toBe(m);
+    });
+  });
   it('mono maps paint-accent to the paint colour', () => {
     const l = new Looks({ ...base, colorMode: 'mono' });
     const a = l.material('paint-accent') as THREE.MeshStandardMaterial;

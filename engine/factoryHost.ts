@@ -54,7 +54,7 @@ export class FactoryHost {
       d.director.attach(def.kind, { line: this.line, firstStage: def.product.stages[0], slotPos: (id) => this.shelfView.slotPos(id) }),
       d.director.events.on('job:created', ({ job }) => { if (job.product === def.kind) this.handleOf(job); }),
       this.line.onPhase((job) => {
-        if (job.phase === 'station') this.instances[job.stationIndex]?.begin(job, this.handleOf(job));
+        if (job.phase === 'station') this.begin(job);
       }),
       d.director.events.on('slot:filled', ({ kind, slotId, job }) => {
         if (kind !== def.kind) return;
@@ -73,6 +73,8 @@ export class FactoryHost {
     this.line.relayout(this.layout.anchors, this.layout.paths);
     this.shelfView.setOrigin(this.layout.shelfOrigin);
     this.build();
+    // the old instances are gone: hand every job that is mid-station to its rebuilt instance
+    for (const job of this.line.jobs) if (job.phase === 'station') this.begin(job);
   }
 
   restyle(): void {
@@ -121,15 +123,16 @@ export class FactoryHost {
       h.root.visible = job.phase !== 'queued';
       h.root.position.set(job.pos[0], job.pos[1], job.pos[2]);
       if (job.phase === 'station') { at[job.stationIndex] = job; this.shaped.delete(job.id); continue; }
-      if (job.phase === 'placing') { h.place(job.progress); continue; }
+      // off-station: the last station's outputStage must be applied before the placing arc starts
       if (this.shaped.get(job.id) !== job.stage) { h.shape(job.stage, 1); this.shaped.set(job.id, job.stage); }
+      if (job.phase === 'placing') h.place(job.progress);
     }
     this.instances.forEach((inst, i) => {
       const j = at[i];
       inst.update(simDt, j, j?.progress ?? 0, j ? this.handles.get(j.id) ?? null : null);
     });
     for (const [id, h] of this.handles) {
-      if (!live.has(id)) { h.dispose(); this.handles.delete(id); this.shaped.delete(id); }
+      if (!live.has(id)) { this.drop(h); this.handles.delete(id); this.shaped.delete(id); }
     }
     this.shelfView.update(realDt);
     return true;
@@ -138,7 +141,7 @@ export class FactoryHost {
   destroy(): void {
     this.teardown();
     for (const off of this.offs) off();
-    for (const h of this.handles.values()) h.dispose();
+    for (const h of this.handles.values()) this.drop(h);
     this.handles.clear();
     this.shelfView.destroy();
     this.root.removeFromParent();
@@ -154,11 +157,30 @@ export class FactoryHost {
     let h = this.handles.get(job.id);
     if (!h) {
       h = this.def.product.create(job, { looks: this.d.looks, marks: this.d.settings().letterMarks });
+      h.root.position.set(job.pos[0], job.pos[1], job.pos[2]);
       h.root.visible = false;
       this.handles.set(job.id, h);
       this.products.add(h.root);
     }
     return h;
+  }
+
+  /** A product handle is dispose()d by its owner, which also detaches it (handles do not detach themselves). */
+  private drop(h: ProductHandle): void {
+    h.dispose();
+    h.root.removeFromParent();
+  }
+
+  private begin(job: Job): void {
+    const h = this.handleOf(job);
+    h.root.position.set(job.pos[0], job.pos[1], job.pos[2]); // begin() sees the product on the station, not at the origin
+    this.instances[job.stationIndex]?.begin(job, h);
+  }
+
+  /** Machines are what the cutaway section slices: tag every mesh `userData.cut` and re-pick its material. */
+  private cutTag(group: THREE.Object3D): void {
+    group.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.userData.cut = true; });
+    this.d.looks.apply(group);
   }
 
   private decide(job: Job, i: number): 'pass' | 'reject' {
@@ -188,6 +210,7 @@ export class FactoryHost {
       const c = buildConveyor(looks, p, { extendStart: i === 0 ? ext : 0, extendEnd: i === this.layout.paths.length - 1 ? ext : 0 });
       this.conveyors.push(c);
       this.world.add(c.group);
+      this.cutTag(c.group);
     });
     const kind = this.def.kind;
     this.instances = this.def.stations.map((st, i) => {
@@ -195,12 +218,14 @@ export class FactoryHost {
       const o = this.layout.anchors[i];
       group.position.set(o[0], o[1], o[2]);
       this.world.add(group);
-      return st.create({
+      const inst = st.create({
         group, origin: o, looks, particles: this.d.particles, audio: this.d.audio, settings: this.d.settings, now: this.d.now,
         placing: () => this.d.director.jobsOf(kind).filter((j) => j.phase === 'placing'),
         product: (id) => this.handles.get(id) ?? null,
         shelfSpan: () => this.shelfView.span(),
       });
+      this.cutTag(group);
+      return inst;
     });
   }
 

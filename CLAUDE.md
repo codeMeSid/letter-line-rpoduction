@@ -67,7 +67,7 @@ uses relative imports (vitest has no alias).
   `glyphs` (`GLYPHS`/`glyph(ch)`: single-stroke set, cell u 0..0.7 × v 0..1 v-down, caps/digits 0..0.8, x-line .25, baseline .8, descender 1; unknown → `?`),
   `surface` (`flatSurface`/`cylinderSurface`/`topSurface` map normalised cell (u,v) → world Vec3, `FRONT_ANGLE` = −y; no SVG/culling; surface u 0..1 ↔ glyph u 0..0.7),
   `particles` (pure sim; buffers public read-only, `specOf(kindIndex)`, `ColorKey`).
-  Three runtime (Task 6): `looks` (`Looks`: role → shared material per look; `own(role)` for per-instance; `apply`/`appearance`; background/edge/particle colours; belt texture),
+  Three runtime (Task 6): `looks` (`Looks`: role → shared material per look; `own(role)` for per-instance; `apply`/`appearance`; background/edge/particle colours; belt texture; cutaway clips per object: meshes with `userData.cut` get `material(role, true)` = clipped by `looks.cutPlane`, the host tags station + conveyor meshes only, `own()` materials are not clipped),
   `renderer` (`createRenderer(root, quality)`: one WebGL canvas), `stage` (`createStage`: lights, env map, tone mapping per look, `fitShadow`),
   `loop` (`createLoop(speedMul, env?)`: the single rAF; dt clamped to `MAX_DT`, sleeps when hidden/idle, `wake()`),
   `particlesView` (`ParticlesView`: normal + additive `THREE.Points` on `PARTICLE_LAYER`; the camera must enable that layer),

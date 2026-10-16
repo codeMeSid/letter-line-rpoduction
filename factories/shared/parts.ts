@@ -244,7 +244,7 @@ export function gauge(looks: Looks, r: number): { group: THREE.Group; set(v: num
   };
 }
 
-/** Small sphere lamp; set(on) swaps userData.role glow↔rubber and its material via looks.material(role). children[0] is the sphere. */
+/** Small sphere lamp; set(on) swaps userData.role glow↔rubber and its material via looks.material(role, userData.cut). children[0] is the sphere. */
 export function lamp(looks: Looks, r: number): { group: THREE.Group; set(on: boolean): void } {
   const group = new THREE.Group();
   const bulb = looks.part(new THREE.SphereGeometry(r, 14, 10), 'rubber');
@@ -256,7 +256,7 @@ export function lamp(looks: Looks, r: number): { group: THREE.Group; set(on: boo
     set(on) {
       const role: MaterialRole = on ? 'glow' : 'rubber';
       bulb.userData.role = role;
-      bulb.material = looks.material(role);
+      bulb.material = looks.material(role, bulb.userData.cut === true);
       bulb.castShadow = !on;
     },
   };

@@ -76,6 +76,10 @@ export class Looks {
   readonly beltTexture: THREE.DataTexture;
   private o: LookOptions;
   private table = new Map<MaterialRole, THREE.Material>();
+  /** Cutaway only: the same roles with `clippingPlanes = [cutPlane]`, for meshes tagged `userData.cut`. */
+  private cutTable = new Map<MaterialRole, THREE.Material>();
+  /** World plane of the cutaway section (normal +y keeps y >= -constant); the Scene moves it. */
+  readonly cutPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
   constructor(o: LookOptions) {
     this.o = o;
@@ -90,14 +94,20 @@ export class Looks {
   get opts(): LookOptions { return this.o; }
 
   set(o: LookOptions): void {
-    for (const m of this.table.values()) m.dispose();
-    this.table.clear();
+    this.disposeTables();
     this.o = o;
   }
 
-  material(role: MaterialRole): THREE.Material {
-    let m = this.table.get(role);
-    if (!m) this.table.set(role, (m = this.make(role)));
+  /** `cut` = the mesh is part of a machine the cutaway section slices (userData.cut); only cutaway honours it. */
+  material(role: MaterialRole, cut = false): THREE.Material {
+    const clipped = cut && this.o.look === 'cutaway';
+    const table = clipped ? this.cutTable : this.table;
+    let m = table.get(role);
+    if (!m) {
+      m = this.make(role);
+      if (clipped) m.clippingPlanes = [this.cutPlane];
+      table.set(role, m);
+    }
     return m;
   }
 
@@ -118,7 +128,7 @@ export class Looks {
   apply(root: THREE.Object3D): void {
     root.traverse((o) => {
       const role = o.userData.role as MaterialRole | undefined;
-      if (role && (o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = this.material(role);
+      if (role && (o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = this.material(role, o.userData.cut === true);
     });
   }
 
@@ -150,9 +160,15 @@ export class Looks {
   }
 
   dispose(): void {
-    for (const m of this.table.values()) m.dispose();
-    this.table.clear();
+    this.disposeTables();
     this.beltTexture.dispose();
+  }
+
+  private disposeTables(): void {
+    for (const t of [this.table, this.cutTable]) {
+      for (const m of t.values()) m.dispose();
+      t.clear();
+    }
   }
 
   private make(role: MaterialRole): THREE.Material {

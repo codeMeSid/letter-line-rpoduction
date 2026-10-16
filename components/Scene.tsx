@@ -67,13 +67,12 @@ export default function Scene() {
       busiest: () => active()?.busiest() ?? null,
       followSpan: () => active()?.followSpan() ?? 400,
     });
-    const cut = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
     const fitStage = () => {
       const b = overview();
       stage.fitShadow(b.min, b.max);
       const a = active();
-      if (a) cut.constant = -a.layout.anchors[0][1];
+      if (a) looks.cutPlane.constant = -a.layout.anchors[0][1];
     };
     const applyLook = () => {
       const s = settings();
@@ -84,7 +83,6 @@ export default function Scene() {
       stage.setLook(looks);
       rig.setLook(s.look);
       post.configure(s.look, s.quality, looks.edgeColor());
-      r.gl.clippingPlanes = s.look === 'cutaway' ? [cut] : [];
     };
     const resize = () => {
       r.resize();
@@ -129,6 +127,7 @@ export default function Scene() {
         settings().set({ hudOpen: !settings().hudOpen });
         return;
       }
+      if ((e.target as Element | null)?.closest?.('.hud, .hud-toggle')) return; // keys on a HUD control stay with the control
       const cmd = keyToCommand({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, repeat: e.repeat, target: e.target as Element | null });
       if (!cmd) return;
       e.preventDefault();
@@ -142,6 +141,7 @@ export default function Scene() {
     window.addEventListener('resize', resize);
     document.addEventListener('visibilitychange', onVisible);
 
+    const offRow = director.events.on('row:new', fitStage); // a new shelf row changes the overview bounds
     const unsub = settingsStore.subscribe((s, p) => {
       if (s.quality !== p.quality) { r.setQuality(s.quality); resize(); }
       if (s.look !== p.look || s.theme !== p.theme || s.colorMode !== p.colorMode || s.quality !== p.quality) applyLook();
@@ -155,6 +155,7 @@ export default function Scene() {
 
     return () => {
       unsub();
+      offRow();
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('pointerdown', onPointer);
       window.removeEventListener('resize', resize);

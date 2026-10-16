@@ -50,10 +50,11 @@ export class ShelfView {
 
   adopt(slotId: number, job: Job, h: ProductHandle | null): void {
     if (!h) return;
-    if (job.isSpace) { h.dispose(); return; }
+    if (job.isSpace) { this.drop(h); return; }
     h.place(1);
     this.group.add(h.root);
-    this.placed.get(slotId)?.dispose();
+    const old = this.placed.get(slotId);
+    if (old) this.drop(old);
     this.placed.set(slotId, h);
   }
 
@@ -72,7 +73,7 @@ export class ShelfView {
     let moving = false;
     for (const [id, h] of this.placed) {
       const slot = this.shelf.getSlot(id);
-      if (!slot || slot.state !== 'filled') { h.dispose(); this.placed.delete(id); continue; }
+      if (!slot || slot.state !== 'filled') { this.drop(h); this.placed.delete(id); continue; }
       const t = this.slotPos(id)!;
       const p = h.root.position;
       p.lerp(new THREE.Vector3(...t), a);
@@ -84,10 +85,16 @@ export class ShelfView {
   restyle(): void { for (const h of this.placed.values()) h.restyle(); }
 
   destroy(): void {
-    for (const h of this.placed.values()) h.dispose();
+    for (const h of this.placed.values()) this.drop(h);
     this.placed.clear();
     this.clearPlanks();
     this.group.removeFromParent();
+  }
+
+  /** dispose() then detach: handles do not remove themselves from their parent. */
+  private drop(h: ProductHandle): void {
+    h.dispose();
+    h.root.removeFromParent();
   }
 
   private level(row: number): number { return this.shelf.rows.length - 1 - row; }

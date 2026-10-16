@@ -43,10 +43,29 @@ describe('ShelfView', () => {
     shelf.remove(s.slotId);
     v.update(1 / 60);
     expect(h.disposed).toBe(true);
+    expect(h.root.parent).toBeNull();
     const sp = shelf.reserve('space', '');
     const hs = handle();
+    new THREE.Group().add(hs.root); // the host parks in-flight handles under its products group
     v.adopt(sp.slotId, job(sp.slotId, true), hs);
     expect(hs.disposed).toBe(true);
+    expect(hs.root.parent).toBeNull();
+  });
+  it('re-adopting a slot disposes and detaches the old handle; destroy disposes and detaches all', () => {
+    const shelf = new Shelf();
+    const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
+    const s = shelf.reserve('char', 'a');
+    shelf.markFilled(s.slotId);
+    const h1 = handle();
+    const h2 = handle();
+    v.adopt(s.slotId, job(s.slotId), h1);
+    v.adopt(s.slotId, job(s.slotId), h2);
+    expect(h1.disposed).toBe(true);
+    expect(h1.root.parent).toBeNull();
+    expect(h2.disposed).toBe(false);
+    v.destroy();
+    expect(h2.disposed).toBe(true);
+    expect(h2.root.parent).toBeNull();
   });
   it('span covers the plank width at the front row', () => {
     const v = new ShelfView(new THREE.Group(), new Shelf(), [26, 8, 32], looks, [100, -400, 0]);
