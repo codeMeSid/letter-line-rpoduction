@@ -13,14 +13,14 @@ its Tasks 5–13 are superseded. Controller-owned file (implementers do not edit
 | 3 | Glyphs + surfaces | complete | b703d52..8810fe9 |
 | 4 | Audio bus + synth | complete | b12795e..392b05b |
 | 5 (old) | SVG runtime + demo line | superseded (snapshot b36476b) | b36476b |
-| 5 | Pure groundwork (pace, line opts, −y layout, letter solid, IK) | pending | |
-| 6 | Three runtime swap (renderer, stage, looks, loop, particles, bench) | pending | |
-| 7 | Post-processing + camera rig | pending | |
-| 8 | Parts kit, conveyor, robot arm | pending | |
-| 9 | 3D contracts, factory host, shelf, scene, minimal HUD | pending | |
-| 10 | Cast metal letter product | pending | |
-| 11 | Letter stations 1–4 | pending | |
-| 12 | Letter stations 5–7, registry, end-to-end | pending | |
+| 5 | Pure groundwork (pace, line opts, −y layout, letter solid, IK) | complete (1 fix round) | 7ba3876..027d297 |
+| 6 | Three runtime swap (renderer, stage, looks, loop, particles, bench) | complete (1 fix round) | 681ad8d..65a5b2c |
+| 7 | Post-processing + camera rig | complete (1 fix round) | 65a5b2c..e58710d |
+| 8 | Parts kit, conveyor, robot arm | complete (1 fix round) | e58710d..a76afe3 |
+| 9 | 3D contracts, factory host, shelf, scene, minimal HUD | complete (1 fix round) | a76afe3..36b5584 |
+| 10 | Cast metal letter product | complete (2 fix rounds) | 36b5584..e6b5c8e |
+| 11 | Letter stations 1–4 | complete (1 fix round) | e6b5c8e..781b9ac |
+| 12 | Letter stations 5–7, registry, end-to-end | complete (2 fix rounds) | 781b9ac..1833d11 |
 | Final | Whole-branch review | pending | |
 
 ## Rulings (decisions made on the user's behalf)
@@ -45,6 +45,11 @@ Format: `Ruling: <what> — <why> — <cost if wrong>`
   flat iso, cutaway); procedural machines; first products cast metal letter then glass bottle; pacing modes
   auto/fast/detailed/cinematic; keep all old features, built alongside; desktop target; sound default off.
   Old Task 5 demo line rejected by the user as placeholder boxes — never ship placeholder visuals as a result.
+
+- Rulings for Tasks 5–12 (R1–R26) are recorded in the SDD ledger and summarised in the final report;
+  key ones: letters keep glyph-cell baseline (R2/R3); shelved letters stand in front of planks (R17b);
+  shelf is a flat 3-row tray with older rows stepping back, robot rail behind (R24, SHELF_FRONT 220);
+  per-object cutaway clipping (R12); line-art crease term at 3 CSS px (R8); stations use roles only (R16).
 
 ## Pre-flight scan
 
