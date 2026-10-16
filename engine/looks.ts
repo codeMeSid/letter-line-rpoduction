@@ -18,7 +18,8 @@ const SPEC: Record<MaterialRole, RoleSpec> = {
   paint: { color: 0x2f4f63, metal: 0.25, rough: 0.55 },
   'paint-accent': { color: 0xe3a817, metal: 0.15, rough: 0.5 },
   rubber: { color: 0x1a1b1d, metal: 0, rough: 0.9 },
-  belt: { color: 0x2a2b2e, metal: 0, rough: 0.85 },
+  // Near-white: the belt multiplies its dark stripe map by this colour, so a dark colour would hide the stripes.
+  belt: { color: 0xd8d8d8, metal: 0, rough: 0.85 },
   copper: { color: 0xb8683a, metal: 0.9, rough: 0.3 },
   glass: { color: 0xdff5ef, metal: 0, rough: 0.05, transmission: 0.92 },
   molten: { color: 0xff7a1a, metal: 0, rough: 0.6, emissive: 0xff5a00, emissiveIntensity: 3 },

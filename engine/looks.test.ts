@@ -61,6 +61,13 @@ describe('Looks', () => {
     expect(c.material('glow').side).toBe(THREE.DoubleSide);
     expect(new Looks({ ...base, look: 'realistic' }).material('glow').side).toBe(THREE.FrontSide);
   });
+  it('belt colour is light: it multiplies the dark stripe map, so a dark colour would hide the stripes', () => {
+    for (const look of ['realistic', 'cutaway', 'flat'] as const) {
+      const m = new Looks({ ...base, look }).material('belt') as THREE.MeshStandardMaterial;
+      expect(m.color.r, look).toBeGreaterThan(0.5);
+      expect(m.map, look).not.toBeNull();
+    }
+  });
   it('mono maps paint-accent to the paint colour', () => {
     const l = new Looks({ ...base, colorMode: 'mono' });
     const a = l.material('paint-accent') as THREE.MeshStandardMaterial;
