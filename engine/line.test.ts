@@ -81,20 +81,21 @@ describe('Line', () => {
     });
   });
 
-  it('a finished job waits in its station (progress 1) while the conveyor is full', () => {
+  it('a full conveyor backs up short of the busy station and keeps station 0 empty until its tail is MIN_GAP away', () => {
     const { line } = build([mkStation('a', 0.1), mkStation('b', 1000)]);
     const jobs = Array.from({ length: 12 }, () => mkJob());
     jobs.forEach((j) => line.enqueue(j));
     run(line, 30);
     expect(jobs[0].phase).toBe('station');
     expect(jobs[0].stationIndex).toBe(1);
-    // conveyor is 120 long: heads at 120, 106, ... , 8 -> 9 jobs
-    expect(jobs.filter((j) => j.phase === 'conveyor')).toHaveLength(9);
-    const waiting = jobs.filter((j) => j.phase === 'station' && j.stationIndex === 0);
-    expect(waiting).toHaveLength(1);
-    expect(waiting[0].progress).toBe(1);
-    expect(jobs.filter((j) => j.phase === 'queued')).toHaveLength(1);
-    expect(jobs[1].progress).toBe(1);
+    // conveyor is 120 long; the head stops MIN_GAP short of the occupied station: 106, 92, ... , 8 -> 8 jobs
+    const belt = jobs.filter((j) => j.phase === 'conveyor');
+    expect(belt).toHaveLength(8);
+    expect(jobs[1].progress).toBeCloseTo((120 - MIN_GAP) / 120, 9);
+    expect(belt[belt.length - 1].progress).toBeCloseTo(8 / 120, 9);
+    // the tail (8) is too close to station 0's anchor for another product to sit there
+    expect(jobs.filter((j) => j.phase === 'station' && j.stationIndex === 0)).toHaveLength(0);
+    expect(jobs.filter((j) => j.phase === 'queued')).toHaveLength(3);
   });
 
   it('keeps MIN_GAP between jobs queued up on a conveyor segment', () => {
@@ -107,6 +108,26 @@ describe('Line', () => {
     });
     expect(minGap).toBeGreaterThanOrEqual(MIN_GAP - 1e-9);
     expect(minGap).toBeLessThan(Infinity);
+  });
+
+  it('products never pass through each other at hand-offs: every frame, any two on the line stay >= MIN_GAP apart', () => {
+    const { line } = build([mkStation('a', 0.2), mkStation('b', 1.5), mkStation('c', 1)]);
+    let placed = 0;
+    line.onPhase((j) => { if (j.phase === 'placing') placed++; });
+    for (let i = 0; i < 12; i++) line.enqueue(mkJob());
+    let worst = Infinity;
+    for (let f = 0; f < 2000; f++) {
+      line.tick(0.05);
+      const live = line.jobs.filter((j) => j.phase !== 'queued'); // queued jobs are hidden, not on the line
+      for (let i = 0; i < live.length; i++) {
+        for (let k = i + 1; k < live.length; k++) {
+          const [p, q] = [live[i].pos, live[k].pos];
+          worst = Math.min(worst, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]));
+        }
+      }
+      expect(worst, `frame ${f}`).toBeGreaterThanOrEqual(MIN_GAP - 1e-9);
+    }
+    expect(placed).toBe(12);
   });
 
   it('moves at CONVEYOR_SPEED along the path', () => {
@@ -271,7 +292,7 @@ describe('Line', () => {
     let jobsDuringTick: number[] = [];
     line.onPhase((j, prev) => {
       seen.push(`${j.id}:${prev}>${j.phase}`);
-      if (j.id === a.id && j.phase === 'conveyor') {
+      if (j.id === a.id && j.phase === 'station' && j.stationIndex === 1) {
         jobsDuringTick = line.jobs.map((x) => x.id);
         expect(line.remove(b.id)).toBe(b);
         line.enqueue(c);
@@ -279,11 +300,12 @@ describe('Line', () => {
     });
     line.enqueue(a);
     line.enqueue(b);
-    // dt 0.5: a enters tick 1, leaves station 0 on tick 3 -- the same tick b enters station 0
-    for (let i = 0; i < 3; i++) line.tick(0.5);
+    // dt 0.5: a leaves station 0 on tick 3; b may enter once a is MIN_GAP down the belt (tick 4);
+    // a reaches station 1 on tick 6 -- the same tick b leaves station 0
+    for (let i = 0; i < 6; i++) line.tick(0.5);
     expect(jobsDuringTick).toEqual([a.id, b.id]); // callback saw a fully consistent line
     expect(b.phase).toBe('destroyed');
-    expect(seen).not.toContain(`${b.id}:queued>station`); // stale event for the removed job is dropped
+    expect(seen.filter((e) => e.startsWith(`${b.id}:`))).toEqual([`${b.id}:queued>station`]); // b's stale station>conveyor is dropped
     expect(line.jobs.map((j) => j.id)).toEqual([a.id, c.id]);
     expect(c.phase).toBe('queued');
     run(line, 30);

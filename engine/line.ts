@@ -179,8 +179,18 @@ export class Line {
     this.emit(job, prev);
   }
 
+  /**
+   * Belt distance from station i's anchor to the nearest job at or past it: 0 while the station is
+   * occupied, else the last job to leave it (Infinity when clear). Nothing may come within minGap of it.
+   */
+  private beyond(i: number): number {
+    if (this.occupant[i]) return 0;
+    const tail = this.segs[i]?.at(-1);
+    return tail ? this.tracks.get(tail.id)!.dist : Infinity;
+  }
+
   private intake(): void {
-    if (this.occupant[0] || this.queue.length === 0) return;
+    if (this.queue.length === 0 || this.beyond(0) < this.minGap) return;
     if (this.jobs.length - this.queue.length >= this.maxInFlight) return;
     this.enterStation(0, this.queue.shift()!, 'queued');
   }
@@ -230,9 +240,10 @@ export class Line {
     for (let k = 0; k < seg.length; ) {
       const job = seg[k];
       const tr = this.tracks.get(job.id)!;
-      const limit = ahead ? ahead.dist - this.minGap : len;
+      // the head never drives into the next station's product or the one that just left it
+      const limit = ahead ? ahead.dist - this.minGap : Math.min(len, len + this.beyond(s + 1) - this.minGap);
       tr.dist = Math.max(tr.dist, Math.min(tr.dist + move, limit));
-      if (!ahead && tr.dist >= len && !this.occupant[s + 1]) {
+      if (!ahead && tr.dist >= len && this.beyond(s + 1) >= this.minGap) {
         seg.splice(k, 1);
         this.enterStation(s + 1, job, 'conveyor');
         continue; // next job becomes the head
