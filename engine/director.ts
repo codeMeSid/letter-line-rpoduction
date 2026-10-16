@@ -111,8 +111,11 @@ export class Director {
 
   /** Advance every line and the placement arcs. Returns true while anything is in flight. */
   update(simDt: number): boolean {
+    // a job arcing to the shelf is still in flight (cinematic shows one product all the way to the shelf)
     const maxInFlight = paceParams(this.o.settings().pace).maxInFlight;
-    for (const h of this.hosts.values()) h.line.maxInFlight = maxInFlight;
+    for (const [kind, h] of this.hosts) {
+      h.line.maxInFlight = maxInFlight - [...this.placing.values()].filter((p) => p.kind === kind).length;
+    }
     for (const h of this.hosts.values()) h.line.tick(simDt);
     for (const p of [...this.placing.values()]) {
       p.t = Math.min(1, p.t + simDt / PLACE_TIME);

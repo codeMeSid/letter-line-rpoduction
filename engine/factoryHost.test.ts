@@ -108,6 +108,29 @@ describe('FactoryHost', () => {
       expect(b.at).not.toEqual([0, 0, 0]);
     }
   });
+  it('newest() follows the newest job on the line, not one arcing to the shelf', () => {
+    const f = setup();
+    f.director.handle({ type: 'char', char: 'a' });
+    f.director.handle({ type: 'char', char: 'b' });
+    const [a, b] = f.director.jobsOf('letter');
+    let checked = 0;
+    for (let i = 0; i < 900 && b.phase !== 'shelved'; i++) {
+      f.step(1);
+      if (a.phase === 'placing' && b.phase !== 'queued' && b.phase !== 'placing') {
+        expect(f.host.newest()).toEqual(b.pos);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+  it('newest() falls back to the placing job when nothing else is on the line', () => {
+    const f = setup();
+    f.director.handle({ type: 'char', char: 'a' });
+    const [a] = f.director.jobsOf('letter');
+    for (let i = 0; i < 900 && a.phase !== 'placing'; i++) f.step(1);
+    expect(a.phase).toBe('placing');
+    expect(f.host.newest()).toEqual(a.pos);
+  });
   it('stations receive their job + handle; off-station jobs are shaped once per stage', () => {
     const f = setup();
     f.director.handle({ type: 'char', char: 'a' });

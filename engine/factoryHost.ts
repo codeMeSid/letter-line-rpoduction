@@ -92,9 +92,11 @@ export class FactoryHost {
     };
   }
 
+  /** Newest job on the line; a job arcing to the shelf only when nothing else is on the line (follow camera). */
   newest(): Vec3 | null {
-    const jobs = this.d.director.jobsOf(this.def.kind).filter((j) => j.phase !== 'queued');
-    return jobs.length ? jobs[jobs.length - 1].pos : null;
+    const onLine = this.line.jobs.filter((j) => j.phase !== 'queued');
+    const jobs = onLine.length ? onLine : this.d.director.jobsOf(this.def.kind).filter((j) => j.phase === 'placing');
+    return jobs.at(-1)?.pos ?? null;
   }
 
   busiest(): Vec3 | null {

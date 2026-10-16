@@ -55,6 +55,8 @@ export class Line {
 
   /** Jobs allowed past the queue at once (Infinity = no cap). Set per frame by the Director from the pace. */
   maxInFlight = Infinity;
+  /** Jobs that left as 'placing' during the current tick: still in flight until the owner hears of them (flush). */
+  private leftThisTick = 0;
 
   constructor(
     private stations: StationDef[],
@@ -115,6 +117,7 @@ export class Line {
   tick(simDt: number): void {
     if (!(simDt > 0)) return;
     const n = this.stations.length;
+    this.leftThisTick = 0;
     for (let i = n - 1; i >= 0; i--) {
       this.updateStation(i, simDt);
       if (i >= 1) this.updateConveyor(i - 1, simDt);
@@ -191,7 +194,7 @@ export class Line {
 
   private intake(): void {
     if (this.queue.length === 0 || this.beyond(0) < this.minGap) return;
-    if (this.jobs.length - this.queue.length >= this.maxInFlight) return;
+    if (this.jobs.length - this.queue.length + this.leftThisTick >= this.maxInFlight) return;
     this.enterStation(0, this.queue.shift()!, 'queued');
   }
 
@@ -215,6 +218,7 @@ export class Line {
     // Finished and accepted: leave if there is room downstream, otherwise wait with progress 1.
     if (i === this.stations.length - 1) {
       this.detach(job);
+      this.leftThisTick++;
       job.phase = 'placing';
       this.emit(job, 'station');
       return;

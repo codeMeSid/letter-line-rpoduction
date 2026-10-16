@@ -4,7 +4,7 @@ import { Line } from './line';
 import { layoutStations } from './layout';
 import { defaultSettings, type Settings } from './settings';
 import type { StationDef } from './station';
-import type { ProductKind, Vec3 } from './types';
+import type { Job, ProductKind, Vec3 } from './types';
 
 const station = (id: string, duration: number): StationDef => ({
   id, label: id, footprint: [60, 60], height: 40, duration,
@@ -198,6 +198,22 @@ describe('Director pace', () => {
     expect(d.speedMul(0)).toBe(1);
     s.pace = 'cinematic';
     expect(d.speedMul(0)).toBe(1);
+  });
+  it('cinematic: a second job does not leave the queue until the first is shelved', () => {
+    const { d, run, typeStr, settings } = setup({ pace: 'cinematic' });
+    const jobs: Job[] = [];
+    d.events.on('job:created', ({ job }) => jobs.push(job));
+    typeStr('ab');
+    const [a, b] = jobs;
+    let sawPlacing = false;
+    for (let i = 0; i < 400 && b.phase !== 'shelved'; i++) {
+      run(0.05);
+      if (a.phase === 'placing') sawPlacing = true;
+      if (b.phase !== 'queued') expect(a.phase, `frame ${i}`).toBe('shelved');
+    }
+    expect(sawPlacing).toBe(true);
+    expect(b.phase).toBe('shelved');
+    expect(settings.pace).toBe('cinematic');
   });
   it('update applies maxInFlight to every attached line', () => {
     const s: Settings = { ...defaultSettings, pace: 'cinematic' };
