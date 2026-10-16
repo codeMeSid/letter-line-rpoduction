@@ -88,6 +88,50 @@ describe('CameraRig', () => {
       before = after;
     }
   });
+  describe('OrbitControls', () => {
+    const noop = () => {};
+    const dom = () => ({
+      addEventListener: noop, removeEventListener: noop, style: {}, clientWidth: 1280, clientHeight: 800,
+      getRootNode: () => ({ addEventListener: noop, removeEventListener: noop }),
+      ownerDocument: { addEventListener: noop, removeEventListener: noop },
+    }) as unknown as HTMLElement;
+    const rigWithControls = () => {
+      const rig = new CameraRig({ overview: () => ({ min: [0, -300, 0], max: [900, 0, 120] }), newest: () => null, busiest: () => null, followSpan: () => 400 });
+      rig.resize(1280, 800, 1);
+      rig.snap();
+      rig.attach(dom());
+      return { rig, c: rig['controls']! };
+    };
+    it('a right-drag pan sticks: the rig hands its target to the controls on start only', () => {
+      const { rig, c } = rigWithControls();
+      const x0 = rig.center().x;
+      c.dispatchEvent({ type: 'start' });
+      for (let i = 0; i < 3; i++) {
+        c.target.x += 50; // what OrbitControls' pan does on pointermove, between frames
+        c.object.position.x += 50;
+        c.update();
+        rig.update(1 / 60, i * 16);
+      }
+      expect(rig.center().x).toBeCloseTo(x0 + 150, 6);
+    });
+    it('clamps: never below the floor plane, sane dolly distance and ortho zoom', () => {
+      const { rig, c } = rigWithControls();
+      expect(c.maxPolarAngle).toBeLessThan(Math.PI / 2);
+      expect(c.maxPolarAngle).toBeGreaterThan(Math.PI / 2 - 0.1);
+      expect(c.minDistance).toBeGreaterThan(0);
+      expect(c.maxDistance).toBeLessThan(Infinity);
+      rig.setLook('flat');
+      c.dispatchEvent({ type: 'start' });
+      rig.ortho.zoom = 1e4; // wheel in, far past any sane close-up
+      rig.update(1 / 60, 0);
+      const inMost = rig.center().halfWidth;
+      expect(inMost).toBeGreaterThan(20);
+      rig.ortho.zoom = 1e-4; // wheel out
+      rig.update(1 / 60, 16);
+      expect(rig.center().halfWidth).toBeLessThan(1e4);
+      expect(rig.center().halfWidth).toBeGreaterThan(inMost);
+    });
+  });
   it('switches projection with the look', () => {
     const rig = new CameraRig({ overview: () => ({ min: [0, 0, 0], max: [100, 100, 100] }), newest: () => null, busiest: () => null, followSpan: () => 400 });
     rig.setLook('flat');

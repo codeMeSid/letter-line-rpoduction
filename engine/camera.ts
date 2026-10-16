@@ -18,6 +18,10 @@ const TAN = Math.tan((FOV * Math.PI) / 360);
 const CINEMATIC_MS = 4000;
 const CINEMATIC_ZOOM = 2.2;
 const USER_HOLD_MS = 4000;
+/** User orbit limits: stay above the floor plane; dolly (persp distance) and zoom (ortho half-height) in world units. */
+const MAX_POLAR = Math.PI / 2 - 0.02;
+const DOLLY: [number, number] = [60, 10000];
+const ORTHO_EXTENT: [number, number] = [30, 4000];
 const Z = new THREE.Vector3(0, 0, 1);
 
 const norm = (v: Vec3): Vec3 => {
@@ -102,7 +106,10 @@ export class CameraRig {
   attach(dom: HTMLElement): void {
     const c = new OrbitControls(this.active(), dom);
     c.enableDamping = false;
-    c.addEventListener('start', () => { this.dragging = true; });
+    c.maxPolarAngle = MAX_POLAR;
+    [c.minDistance, c.maxDistance] = DOLLY;
+    // hand over the rig's target once; while the user holds control, OrbitControls owns it (pan sticks)
+    c.addEventListener('start', () => { this.dragging = true; c.target.copy(this.target); });
     c.addEventListener('end', () => { this.dragging = false; this.userUntil = performance.now() + USER_HOLD_MS; });
     this.controls = c;
   }
@@ -119,7 +126,6 @@ export class CameraRig {
   /** Returns true (the camera always participates in the frame). */
   update(realDt: number, now: number): boolean {
     if (this.controls && (this.dragging || now < this.userUntil)) {
-      this.controls.target.copy(this.target);
       this.controls.update();
       this.readBack();
       return true;
@@ -177,7 +183,7 @@ export class CameraRig {
     this.target.copy(this.controls!.target);
     this.dir.copy(cam.position).sub(this.target).normalize();
     if (this.isOrtho()) {
-      this.extent = this.extent / this.ortho.zoom;
+      this.extent = THREE.MathUtils.clamp(this.extent / this.ortho.zoom, ...ORTHO_EXTENT);
       this.ortho.zoom = 1;
     } else {
       this.extent = cam.position.distanceTo(this.target);
