@@ -223,7 +223,7 @@ class LetterHandle implements ProductHandle {
 export const letterProduct: ProductModel = {
   kind: 'letter',
   stages: LETTER_STAGES,
-  size: [Math.ceil(0.7 * LETTER_H + 2 * LETTER_R), 2 * LETTER_R + 2, LETTER_H + 2 * LETTER_R],
+  size: [Math.ceil(0.7 * LETTER_H + 2 * LETTER_R), 2 * LETTER_R, LETTER_H + 2 * LETTER_R], // y = exact thickness: the shelf stands the back face flush with the plank front
   lineSize: PALLET,
   create: (job: Job, ctx: ProductCtx) => new LetterHandle(job, ctx),
 };

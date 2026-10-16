@@ -22,19 +22,19 @@ describe('ShelfView', () => {
     const pa = v.slotPos(a.slotId)!;
     const pb = v.slotPos(b.slotId)!;
     expect(pb[0]).toBeGreaterThan(pa[0]);
-    expect(pa[1]).toBe(-407); // plank front (-400 - depth 22 / 2) + size[1] 8 / 2
+    expect(pa[1]).toBe(-415); // plank front (-400 - depth 22 / 2) - size[1] 8 / 2: the letter stands in front of the plank
     shelf.newline();
     shelf.reserve('char', 'c');
     const pa2 = v.slotPos(a.slotId)!;
     expect(pa2[2]).toBeGreaterThan(pa[2]);
     expect(pa2[1]).toBeGreaterThan(pa[1]);
   });
-  it('row 0 slots sit at the plank front edge so descenders hang over the ledge', () => {
+  it('row 0 slots stand just in front of the plank (back face flush with its front face)', () => {
     const shelf = new Shelf();
     const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
     const s = shelf.reserve('char', 'a');
     const plankFrontY = v.bounds().min[1];
-    expect(v.slotPos(s.slotId)![1]).toBeCloseTo(plankFrontY + 8 / 2, 6);
+    expect(v.slotPos(s.slotId)![1]).toBeCloseTo(plankFrontY - 8 / 2, 6);
   });
   it('adopt places the product, damps it to its slot, disposes on removal; spaces are disposed', () => {
     const shelf = new Shelf();

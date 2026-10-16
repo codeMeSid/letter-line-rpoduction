@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { letterGeometry } from '../../engine/letterSolid';
 import { Looks, type LookOptions } from '../../engine/looks';
 import { defaultSettings } from '../../engine/settings';
+import { Shelf } from '../../shelf/model';
+import { ShelfView } from '../../shelf/view';
 import type { Job } from '../../engine/types';
 import { LETTER_H, LETTER_R, letterProduct, LETTER_STAGES } from './product';
 
@@ -80,6 +82,24 @@ describe('letterProduct', () => {
     let best = Infinity;
     for (let i = 0; i < pos.count; i++) best = Math.min(best, Math.hypot(pos.getX(i) - at.x, pos.getY(i) - at.y, pos.getZ(i) - at.z));
     expect(best).toBeLessThanOrEqual(LETTER_R + 1e-3);
+  });
+  it('a shelved descender stands entirely in front of the plank, back face flush with it', () => {
+    expect(letterProduct.size[1]).toBe(2 * LETTER_R);
+    const looks = new Looks(opts);
+    const shelf = new Shelf();
+    const v = new ShelfView(new THREE.Group(), shelf, letterProduct.size, looks, [0, -400, 0]);
+    const slot = shelf.reserve('char', 'g');
+    shelf.markFilled(slot.slotId);
+    const h = letterProduct.create({ ...job('g'), slotId: slot.slotId }, { looks, marks: defaultSettings.letterMarks });
+    h.shape('polished', 1);
+    v.adopt(slot.slotId, { ...job('g'), slotId: slot.slotId }, h);
+    for (let i = 0; i < 600; i++) v.update(1 / 60);
+    v.group.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(h.root.getObjectByName('letter')!);
+    const plankFrontY = v.bounds().min[1];
+    expect(b.min.z).toBeLessThan(v.span().z - 1); // a real descender, below the plank top
+    expect(b.max.y).toBeLessThanOrEqual(plankFrontY + 1e-6);
+    expect(b.max.y).toBeGreaterThan(plankFrontY - 1e-3);
   });
   it('a space job is a bare pallet that survives every stage', () => {
     const looks = new Looks(opts);
