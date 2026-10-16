@@ -102,7 +102,8 @@ export class ShelfView {
   private cellPos(row: number, col: number): Vec3 {
     const L = this.level(row);
     const [ox, oy, oz] = this.origin;
-    return [ox + MARGIN + (col + 0.5) * this.pitch, oy + L * BACK, oz + BASE + L * this.rowH];
+    // y: the product's front face is flush with the plank's front face, so descenders hang over the ledge instead of piercing the plank.
+    return [ox + MARGIN + (col + 0.5) * this.pitch, oy + L * BACK - this.depth / 2 + this.size[1] / 2, oz + BASE + L * this.rowH];
   }
 
   private clearPlanks(): void {

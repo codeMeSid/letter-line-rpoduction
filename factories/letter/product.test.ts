@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { letterGeometry } from '../../engine/letterSolid';
 import { Looks, type LookOptions } from '../../engine/looks';
 import { defaultSettings } from '../../engine/settings';
 import type { Job } from '../../engine/types';
-import { letterProduct, LETTER_STAGES } from './product';
+import { LETTER_H, LETTER_R, letterProduct, LETTER_STAGES } from './product';
 
 const opts: LookOptions = { look: 'realistic', theme: 'dark', colorMode: 'accent', quality: 'high' };
 const job = (char: string, isSpace = false): Job => ({ id: 1, slotId: 1, char, isSpace, special: 'none', product: 'letter', stage: 'flask', phase: 'station', stationIndex: 0, progress: 0, pos: [0, 0, 22], defect: false, retries: 0 });
@@ -16,12 +17,14 @@ describe('letterProduct', () => {
   it('metal appears during the pour, clipped to the fill level, and ends chrome', () => {
     const looks = new Looks(opts);
     const h = letterProduct.create(job('A'), { looks, marks: defaultSettings.letterMarks });
+    expect(metal(h.root).visible).toBe(false); // a fresh handle is already the empty flask
     h.shape('moulded', 1);
     expect(metal(h.root).visible).toBe(false);
     h.shape('poured', 0.5);
     const m = metal(h.root);
     expect(m.visible).toBe(true);
     const mat = m.material as THREE.MeshStandardMaterial;
+    expect(mat.clipShadows).toBe(true);
     expect(mat.clippingPlanes).toHaveLength(1);
     expect(mat.clippingPlanes![0].constant).toBeLessThan(1e5);
     expect(mat.emissiveIntensity).toBeGreaterThan(1);
@@ -69,6 +72,14 @@ describe('letterProduct', () => {
     expect(sand.visible).toBe(false);
     h.shape('ground', 1);
     expect(flash()).toBeUndefined();
+  });
+  it.each(['A', 'T', '-'])('the sprue attaches on a stroke of %s', (ch) => {
+    const h = letterProduct.create(job(ch), { looks: new Looks(opts), marks: defaultSettings.letterMarks });
+    const at = h.root.getObjectByName('sprue')!.position;
+    const pos = letterGeometry(ch, { height: LETTER_H, radius: LETTER_R }).getAttribute('position');
+    let best = Infinity;
+    for (let i = 0; i < pos.count; i++) best = Math.min(best, Math.hypot(pos.getX(i) - at.x, pos.getY(i) - at.y, pos.getZ(i) - at.z));
+    expect(best).toBeLessThanOrEqual(LETTER_R + 1e-3);
   });
   it('a space job is a bare pallet that survives every stage', () => {
     const looks = new Looks(opts);

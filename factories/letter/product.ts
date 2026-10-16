@@ -121,18 +121,24 @@ class LetterHandle implements ProductHandle {
     const sprue = new THREE.Mesh(g.sprue, mat);
     sprue.name = 'sprue';
     const zMid = (bb.min.z + bb.max.z) / 2;
-    sprue.position.set(bb.min.x + LETTER_R, 0, zMid); // sticks out of the letter's left side
+    // Attach at the leftmost vertex's height (x/z), seated one radius inside the stroke, so the stub always touches a stroke.
+    const pos = solid.getAttribute('position');
+    let left = 0;
+    for (let i = 1; i < pos.count; i++) if (pos.getX(i) < pos.getX(left)) left = i;
+    sprue.position.set(pos.getX(left) + LETTER_R, 0, pos.getZ(left)); // sticks out of the letter's left side
     for (const m of [metal, flash, sprue]) m.castShadow = m.receiveShadow = true;
     const letter = new THREE.Group();
     letter.name = 'letter';
     letter.add(metal, sprue); // flash joins in shape() once the letter is full
     this.root.add(letter);
     this.c = { flaskL, flaskR, sand, cavity, letter, metal, flash, sprue, mat, plane, minZ: bb.min.z, zMid, hz: bb.max.z - bb.min.z };
+    this.shape(LETTER_STAGES[0], 0); // never show the finished state before the first shape() call
   }
 
   private ownMaterial(plane: THREE.Plane): THREE.Material {
     const mat = this.ctx.looks.own('product');
     mat.clippingPlanes = [plane];
+    mat.clipShadows = true; // shadows follow the fill plane too
     return mat;
   }
 
