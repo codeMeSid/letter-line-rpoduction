@@ -12,7 +12,9 @@ import { createPost } from '@/engine/post';
 import { createRenderer } from '@/engine/renderer';
 import { settingsStore } from '@/engine/settings';
 import { createStage } from '@/engine/stage';
-import { LOOKS, type Vec3 } from '@/engine/types';
+import type { ProductHandle } from '@/engine/product';
+import { LOOKS, type Job, type Vec3 } from '@/engine/types';
+import { letterProduct, LETTER_STAGES } from '@/factories/letter/product';
 import { buildConveyor } from '@/factories/shared/conveyor';
 import {
   beam, column, disposeTree, flange, gauge, gear, hazardBand, housing, legs, panel, pipe, piston, railing,
@@ -24,7 +26,12 @@ interface BenchCtx {
   scene: THREE.Scene;
   looks: Looks;
   particles: ParticleSystem;
+  /** The letter view's scrubber state, written by the HTML controls and read every frame. */
+  live: { current: LiveLetter };
 }
+
+/** `scrub` 0..7: the integer part picks the letter stage, the fraction is t. */
+interface LiveLetter { scrub: number; char: string }
 
 /** One row of the bench. Add a row = write a `(ctx) => BenchRow` and append it to ROWS. */
 interface BenchRow {
@@ -51,6 +58,7 @@ const VIEWS = {
   line: { frame: { min: [-40, -330, 0], max: [660, -120, 170] }, shadow: { min: [-40, -330, 0], max: [660, -100, 170] }, cut: -200 },
   machine: { frame: { min: [-360, -310, 0], max: [-30, -100, 110] }, shadow: { min: [-360, -310, 0], max: [-30, -100, 110] }, cut: -250 },
   detail: { frame: { min: [-325, -290, 10], max: [-105, -240, 80] }, shadow: { min: [-360, -310, 0], max: [-30, -100, 110] }, cut: -250 },
+  letter: { frame: { min: [-235, -465, 0], max: [235, -337, 38] }, shadow: { min: [-250, -480, 0], max: [250, -330, 60] }, cut: -1000 },
 } satisfies Record<string, { frame: Box; shadow: Box; cut: number }>;
 type ViewKey = keyof typeof VIEWS;
 const VIEW_KEYS = Object.keys(VIEWS) as ViewKey[];
@@ -152,7 +160,61 @@ function partsRow({ scene, looks }: BenchCtx): BenchRow {
   };
 }
 
-const ROWS: ((ctx: BenchCtx) => BenchRow)[] = [swatchRow, partsRow];
+const LETTER_ROW_Y = -360;
+const LETTER_LIVE_Y = -430;
+const letterJob = (char: string): Job => ({
+  id: 1, slotId: 1, char, isSpace: !char.trim(), special: 'none', product: 'letter', stage: LETTER_STAGES[0],
+  phase: 'station', stationIndex: 0, progress: 0, pos: [0, 0, 0], defect: false, retries: 0,
+});
+/** Scrub position → [stage, t]. 7 = the last stage, finished. */
+const scrubStage = (scrub: number): [string, number] => {
+  const k = Math.min(LETTER_STAGES.length - 1, Math.max(0, Math.floor(scrub)));
+  return [LETTER_STAGES[k], Math.min(1, scrub - k)];
+};
+
+/**
+ * Task 10 letter row at y = -360: one 'A' per stage at shape(stage, 1), and a live letter in front
+ * driven by the scrubber (range 0..7) and the char box.
+ */
+function letterRow({ scene, looks, live }: BenchCtx): BenchRow {
+  const pc = { looks, marks: settingsStore.getState().letterMarks };
+  const make = (char: string, x: number, y: number): ProductHandle => {
+    const h = letterProduct.create(letterJob(char), pc);
+    h.root.position.set(x, y, 0);
+    scene.add(h.root);
+    return h;
+  };
+  const fixed = LETTER_STAGES.map((stage, i) => {
+    const h = make('A', (i - 3) * 62, LETTER_ROW_Y);
+    h.shape(stage, 1);
+    return h;
+  });
+  let char = live.current.char;
+  let scrub = NaN;
+  let liveH = make(char, 0, LETTER_LIVE_Y);
+  return {
+    update() {
+      if (live.current.char !== char) {
+        liveH.dispose();
+        char = live.current.char;
+        liveH = make(char, 0, LETTER_LIVE_Y);
+        scrub = NaN;
+      }
+      if (live.current.scrub !== scrub) {
+        scrub = live.current.scrub;
+        liveH.shape(...scrubStage(scrub));
+      }
+    },
+    restyle() {
+      for (const h of [...fixed, liveH]) h.restyle();
+    },
+    dispose() {
+      for (const h of [...fixed, liveH]) h.dispose();
+    },
+  };
+}
+
+const ROWS: ((ctx: BenchCtx) => BenchRow)[] = [swatchRow, partsRow, letterRow];
 
 /** Cutaway look: keep y >= the view's cut, so the parts show their halved interior. */
 const CUT_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -165,6 +227,8 @@ export default function Bench() {
   const viewRef = useRef<((v: ViewKey) => void) | null>(null);
   const [mode, setMode] = useState<CameraMode>('overview');
   const [viewKey, setViewKey] = useState<ViewKey>('swatches');
+  const liveRef = useRef<LiveLetter>({ scrub: 0, char: 'A' });
+  const [live, setLive] = useState<LiveLetter>(liveRef.current);
   const [opts, setOpts] = useState<LookOptions>(() => {
     const s = settingsStore.getState();
     return { look: s.look, theme: s.theme, colorMode: s.colorMode, quality: s.quality };
@@ -181,10 +245,10 @@ export default function Bench() {
     const view = new ParticlesView(particles, (k) => looks.particleColor(k));
     r.scene.add(view.group);
 
-    const floor = looks.part(new THREE.BoxGeometry(1300, 520, 4).translate(150, -140, -2), 'concrete');
+    const floor = looks.part(new THREE.BoxGeometry(1300, 640, 4).translate(150, -200, -2), 'concrete');
     r.scene.add(floor);
     stage.fitShadow(VIEWS.swatches.shadow.min, VIEWS.swatches.shadow.max);
-    const ctx: BenchCtx = { scene: r.scene, looks, particles };
+    const ctx: BenchCtx = { scene: r.scene, looks, particles, live: liveRef };
     const rows = ROWS.map((row) => row(ctx));
 
     let frame: Box = VIEWS.swatches.frame;
@@ -271,6 +335,11 @@ export default function Bench() {
   }, []);
 
   const set = (patch: Partial<LookOptions>) => restyleRef.current?.(patch);
+  const setLiveLetter = (patch: Partial<LiveLetter>) => {
+    liveRef.current = { ...liveRef.current, ...patch };
+    setLive(liveRef.current);
+  };
+  const [liveStage, liveT] = scrubStage(live.scrub);
   return (
     <>
       <div ref={rootRef} className="stage" />
@@ -298,6 +367,21 @@ export default function Bench() {
             quality: {opts.quality}
           </button>
         </div>
+        {viewKey === 'letter' && (
+          <div className="bench-live">
+            <label>
+              stage {liveStage} {liveT.toFixed(2)}
+              <input
+                type="range" min={0} max={LETTER_STAGES.length} step={0.01} value={live.scrub}
+                onChange={(e) => setLiveLetter({ scrub: Number(e.target.value) })}
+              />
+            </label>
+            <label>
+              char
+              <input type="text" maxLength={1} value={live.char} onChange={(e) => setLiveLetter({ char: e.target.value })} />
+            </label>
+          </div>
+        )}
         <div className="bench-caption">{MATERIAL_ROLES.map((role, i) => `${i + 1} ${role}`).join(' · ')}</div>
       </div>
     </>
