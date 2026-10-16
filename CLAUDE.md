@@ -92,6 +92,10 @@ uses relative imports (vitest has no alias).
   `robotArm` (`RobotArm`: `reach`/`grip`/`tip`/`dispose`). Bench views: `/dev/bench` buttons `view: swatches|line|machine|detail`|letter`.
   `letter/`: `visual.ts` (pure `letterVisual(stage, t)`, `LETTER_STAGES`) + `product.ts` (`letterProduct`: flask/sand/cavity/molten metal clipped by a world fill plane,
   sprue + flash (flash is only attached to the `letter` group while shown), `place()` stands it upright; `PALLET_T`, `SAND_TOP`, `LETTER_H/R`). `view: letter` has a stage scrubber + char box.
+  `letter/stations/`: one file per station (`moulder`, `pour`, `cooling`, `shakeout`; Task 12 adds 5–7) + `common.ts` (`FLOOR`, `ss`, `ease`, `stationBase`,
+  `helix`, `world`/`floorZ` for world-space particles, `teardown(group, keep)`, `oneShots()`) + `testkit.ts` (tests only). Stations build every mesh
+  in `create()` with `looks.part`/parts kit (R16: never `own()`); later frames only move/show/swap geometry. `view: stations|moulder|pour|cooling|shakeout`
+  runs each station on a looping fake job with a freeze-at-t slider; those views cut per object like the real Scene.
 - `fx/` — shotgun, chute, broom, forklift, workers, day/night
 - `hud/` — `Hud.tsx` minimal settings panel (look/pace/camera/theme/quality/sound; Escape or gear toggles; styles `.hud*` in `globals.css`). Gauges later
 - `components/Scene.tsx` — client entry: renderer, looks, stage, post, rig, one `FactoryHost` per registered kind (`factories/registry.ts`: `FACTORIES`, `factoryOrigin`), director, the single loop, key routing, settings subscription (`applyLook` = `looks.set` then `looks.apply(scene)` + host restyle; cutaway forces `pan` layout + clip plane)

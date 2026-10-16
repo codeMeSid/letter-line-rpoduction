@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import type { AudioBus } from '@/audio/bus';
 import { CameraRig, type CameraMode } from '@/engine/camera';
 import { createLoop } from '@/engine/loop';
 import { Looks, MATERIAL_ROLES, type LookOptions } from '@/engine/looks';
@@ -13,9 +14,15 @@ import { createRenderer } from '@/engine/renderer';
 import { settingsStore } from '@/engine/settings';
 import { createStage } from '@/engine/stage';
 import type { ProductHandle } from '@/engine/product';
+import type { StationDef } from '@/engine/station';
 import { LOOKS, type Job, type Vec3 } from '@/engine/types';
 import { letterProduct, LETTER_STAGES } from '@/factories/letter/product';
+import { cooling } from '@/factories/letter/stations/cooling';
+import { moulder } from '@/factories/letter/stations/moulder';
+import { pour } from '@/factories/letter/stations/pour';
+import { shakeout } from '@/factories/letter/stations/shakeout';
 import { buildConveyor } from '@/factories/shared/conveyor';
+import { BELT_TOP } from '@/factories/shared/dims';
 import {
   beam, column, disposeTree, flange, gauge, gear, hazardBand, housing, legs, panel, pipe, piston, railing,
 } from '@/factories/shared/parts';
@@ -30,8 +37,8 @@ interface BenchCtx {
   live: { current: LiveLetter };
 }
 
-/** `scrub` 0..7: the integer part picks the letter stage, the fraction is t. */
-interface LiveLetter { scrub: number; char: string }
+/** `scrub` 0..7: the integer part picks the letter stage, the fraction is t. `stationT` < 0 runs the station row; 0..1 freezes every station at that t. */
+interface LiveLetter { scrub: number; char: string; stationT: number }
 
 /** One row of the bench. Add a row = write a `(ctx) => BenchRow` and append it to ROWS. */
 interface BenchRow {
@@ -49,9 +56,19 @@ const ROW_BOX: { min: Vec3; max: Vec3 } = {
   min: [SWATCH_X0 - 20, -20, 0],
   max: [SWATCH_X0 + MATERIAL_ROLES.length * SWATCH_STEP + 20, 20, 30],
 };
+type Box = { min: Vec3; max: Vec3 };
 const MODES: CameraMode[] = ['overview', 'cinematic'];
 
-type Box = { min: Vec3; max: Vec3 };
+/** Task 11 station row: the letter stations side by side at y = STATION_Y, each working a looping job. */
+const STATION_Y = 300;
+const STATION_DEFS: StationDef[] = [moulder, pour, cooling, shakeout];
+const STATION_XS = [-240, -80, 80, 240];
+const stationView = (x0: number, x1: number) => ({
+  frame: { min: [x0, STATION_Y - 60, 0], max: [x1, STATION_Y + 60, 150] },
+  shadow: { min: [-360, STATION_Y - 80, 0], max: [360, STATION_Y + 100, 170] },
+  cut: STATION_Y,
+}) satisfies { frame: Box; shadow: Box; cut: number };
+
 /** What the overview camera frames, the world box the sun's shadow map covers, and where the cutaway look slices (keeps y >= cut). */
 const VIEWS = {
   swatches: { frame: ROW_BOX, shadow: { min: [-380, -120, 0], max: [380, 120, 60] }, cut: 0 },
@@ -59,9 +76,16 @@ const VIEWS = {
   machine: { frame: { min: [-360, -310, 0], max: [-30, -100, 110] }, shadow: { min: [-360, -310, 0], max: [-30, -100, 110] }, cut: -250 },
   detail: { frame: { min: [-325, -290, 10], max: [-105, -240, 80] }, shadow: { min: [-360, -310, 0], max: [-30, -100, 110] }, cut: -250 },
   letter: { frame: { min: [-235, -465, 0], max: [235, -337, 38] }, shadow: { min: [-250, -480, 0], max: [250, -330, 60] }, cut: -1000 },
+  stations: stationView(-320, 320),
+  moulder: stationView(STATION_XS[0] - 75, STATION_XS[0] + 75),
+  pour: stationView(STATION_XS[1] - 75, STATION_XS[1] + 75),
+  cooling: stationView(STATION_XS[2] - 75, STATION_XS[2] + 75),
+  shakeout: stationView(STATION_XS[3] - 75, STATION_XS[3] + 75),
 } satisfies Record<string, { frame: Box; shadow: Box; cut: number }>;
 type ViewKey = keyof typeof VIEWS;
 const VIEW_KEYS = Object.keys(VIEWS) as ViewKey[];
+/** Views of the station row cut like the real Scene: per object (machines only, products stay whole). */
+const LOCAL_CUT = new Set<ViewKey>(['stations', 'moulder', 'pour', 'cooling', 'shakeout']);
 
 /** One rounded box per material role, +x apart; sprays spark + sand at the row's end. */
 function swatchRow({ scene, looks, particles }: BenchCtx): BenchRow {
@@ -214,7 +238,89 @@ function letterRow({ scene, looks, live }: BenchCtx): BenchRow {
   };
 }
 
-const ROWS: ((ctx: BenchCtx) => BenchRow)[] = [swatchRow, partsRow, letterRow];
+const NO_AUDIO = { play() {}, loop: () => ({ setGain() {}, stop() {} }) } as unknown as AudioBus;
+const STATION_CHARS = 'CAST';
+const IDLE_GAP = 0.6; // s between jobs, so the idle ease-back shows
+
+/**
+ * Task 11 station row at y = STATION_Y on one belt: each station gets a real letter handle and a looping fake job
+ * (t 0→1 over its duration, a short idle gap, then the product resets to shape(prevStage, 1)). Meshes are
+ * cut-tagged like FactoryHost does. `live.stationT` >= 0 freezes every station at that t.
+ */
+function stationsRow({ scene, looks, particles, live }: BenchCtx): BenchRow {
+  const root = new THREE.Group();
+  scene.add(root);
+  const xs = STATION_XS;
+  const conveyor = buildConveyor(looks, [[xs[0] - 100, STATION_Y, BELT_TOP], [xs[xs.length - 1] + 100, STATION_Y, BELT_TOP]]);
+  root.add(conveyor.group);
+  let clock = 0;
+  const pc = { looks, marks: settingsStore.getState().letterMarks };
+  const rigs = STATION_DEFS.map((def, i) => {
+    const origin: Vec3 = [xs[i], STATION_Y, BELT_TOP];
+    const group = new THREE.Group();
+    group.position.set(...origin);
+    root.add(group);
+    const inst = def.create({
+      group, origin, looks, particles, audio: NO_AUDIO, settings: () => settingsStore.getState(), now: () => clock * 1000,
+      placing: () => [], product: () => null, shelfSpan: () => ({ x0: 0, x1: 0, y: 0, z: 0 }),
+    });
+    group.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.userData.cut = true; });
+    looks.apply(group);
+    const prev = LETTER_STAGES[LETTER_STAGES.indexOf(def.outputStage as (typeof LETTER_STAGES)[number]) - 1];
+    const job: Job = { ...letterJob(STATION_CHARS[i]), stationIndex: i, stage: prev, pos: origin };
+    const product = letterProduct.create(job, pc);
+    scene.add(product.root);
+    let p = 0;
+    let done = false;
+    const start = () => {
+      p = 0;
+      done = false;
+      product.shape(prev, 1);
+      inst.begin(job, product);
+    };
+    start();
+    return {
+      inst,
+      product,
+      step(dt: number, frozen: number) {
+        product.root.position.set(...origin); // the host positions the root before every station update
+        if (frozen >= 0) return inst.update(dt, job, frozen, product);
+        p += dt / def.duration;
+        if (p <= 1) return inst.update(dt, job, p, product);
+        if (!done) {
+          inst.update(0, job, 1, product);
+          inst.finish(job);
+          done = true;
+        }
+        inst.update(dt, null, 0, null);
+        if (p > 1 + IDLE_GAP / def.duration) start();
+      },
+    };
+  });
+  return {
+    update(dt) {
+      clock += dt;
+      conveyor.update(dt, 80);
+      for (const r of rigs) r.step(dt, live.current.stationT);
+    },
+    restyle() {
+      for (const r of rigs) {
+        r.inst.restyle?.();
+        r.product.restyle();
+      }
+    },
+    dispose() {
+      for (const r of rigs) {
+        r.inst.destroy();
+        r.product.dispose();
+      }
+      conveyor.dispose();
+      disposeTree(root);
+    },
+  };
+}
+
+const ROWS: ((ctx: BenchCtx) => BenchRow)[] = [swatchRow, partsRow, letterRow, stationsRow];
 
 /** Cutaway look: keep y >= the view's cut, so the parts show their halved interior. */
 const CUT_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -227,7 +333,7 @@ export default function Bench() {
   const viewRef = useRef<((v: ViewKey) => void) | null>(null);
   const [mode, setMode] = useState<CameraMode>('overview');
   const [viewKey, setViewKey] = useState<ViewKey>('swatches');
-  const liveRef = useRef<LiveLetter>({ scrub: 0, char: 'A' });
+  const liveRef = useRef<LiveLetter>({ scrub: 0, char: 'A', stationT: -0.05 });
   const [live, setLive] = useState<LiveLetter>(liveRef.current);
   const [opts, setOpts] = useState<LookOptions>(() => {
     const s = settingsStore.getState();
@@ -245,14 +351,19 @@ export default function Bench() {
     const view = new ParticlesView(particles, (k) => looks.particleColor(k));
     r.scene.add(view.group);
 
-    const floor = looks.part(new THREE.BoxGeometry(1300, 640, 4).translate(150, -200, -2), 'concrete');
+    const floor = looks.part(new THREE.BoxGeometry(1300, 940, 4).translate(150, -50, -2), 'concrete');
     r.scene.add(floor);
     stage.fitShadow(VIEWS.swatches.shadow.min, VIEWS.swatches.shadow.max);
     const ctx: BenchCtx = { scene: r.scene, looks, particles, live: liveRef };
     const rows = ROWS.map((row) => row(ctx));
 
     let frame: Box = VIEWS.swatches.frame;
+    let current: ViewKey = 'swatches';
     CUT_PLANE.constant = -VIEWS.swatches.cut; // module-level plane: a remount must not inherit the last view's cut
+    looks.cutPlane.constant = -VIEWS.swatches.cut;
+    const clip = () => {
+      r.gl.clippingPlanes = looks.opts.look === 'cutaway' && !LOCAL_CUT.has(current) ? [CUT_PLANE] : [];
+    };
     const rig = new CameraRig({ overview: () => frame, newest: () => null, busiest: () => null, followSpan: () => 400 });
     const post = createPost(r.gl, r.scene);
     const sync = () => {
@@ -265,7 +376,7 @@ export default function Bench() {
       const o = looks.opts;
       rig.setLook(o.look);
       post.configure(o.look, o.quality, looks.edgeColor());
-      r.gl.clippingPlanes = o.look === 'cutaway' ? [CUT_PLANE] : [];
+      clip();
     };
     sync();
     configure();
@@ -305,7 +416,10 @@ export default function Bench() {
     };
     viewRef.current = (v) => {
       frame = VIEWS[v].frame;
+      current = v;
       CUT_PLANE.constant = -VIEWS[v].cut;
+      looks.cutPlane.constant = -VIEWS[v].cut;
+      clip();
       stage.fitShadow(VIEWS[v].shadow.min, VIEWS[v].shadow.max);
       rig.snap();
       setViewKey(v);
@@ -367,6 +481,17 @@ export default function Bench() {
             quality: {opts.quality}
           </button>
         </div>
+        {LOCAL_CUT.has(viewKey) && (
+          <div className="bench-live">
+            <label>
+              {live.stationT < 0 ? 'stations: running' : `stations frozen at t ${live.stationT.toFixed(2)}`}
+              <input
+                type="range" min={-0.05} max={1} step={0.01} value={live.stationT}
+                onChange={(e) => setLiveLetter({ stationT: Number(e.target.value) })}
+              />
+            </label>
+          </div>
+        )}
         {viewKey === 'letter' && (
           <div className="bench-live">
             <label>
