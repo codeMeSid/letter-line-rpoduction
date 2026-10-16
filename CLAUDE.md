@@ -89,7 +89,9 @@ uses relative imports (vitest has no alias).
 - `factories/` — one folder per product + `shared/`: `dims` (`BELT_TOP`, `BELT_W`), `ik`, `parts` (`housing`/`box`/`column`/`beam`/`pipe`/`lathe`
   + `flange`/`piston`/`gear`/`gauge`/`lamp`/`panel`/`hazardBand`/`railing`/`legs`; z-up, bottom at z=0, centred on x/y; `merged`, `disposeTree`),
   `conveyor` (`buildConveyor(looks, path, opts)` → `{group, update(simDt, speed), dispose()}`; belt scroll itself is `Looks.scrollBelts`),
-  `robotArm` (`RobotArm`: `reach`/`grip`/`tip`/`dispose`). Bench views: `/dev/bench` buttons `view: swatches|line|machine|detail`
+  `robotArm` (`RobotArm`: `reach`/`grip`/`tip`/`dispose`). Bench views: `/dev/bench` buttons `view: swatches|line|machine|detail`|letter`.
+  `letter/`: `visual.ts` (pure `letterVisual(stage, t)`, `LETTER_STAGES`) + `product.ts` (`letterProduct`: flask/sand/cavity/molten metal clipped by a world fill plane,
+  sprue + flash (flash is only attached to the `letter` group while shown), `place()` stands it upright; `PALLET_T`, `SAND_TOP`, `LETTER_H/R`). `view: letter` has a stage scrubber + char box.
 - `fx/` — shotgun, chute, broom, forklift, workers, day/night
 - `hud/` — `Hud.tsx` minimal settings panel (look/pace/camera/theme/quality/sound; Escape or gear toggles; styles `.hud*` in `globals.css`). Gauges later
 - `components/Scene.tsx` — client entry: renderer, looks, stage, post, rig, one `FactoryHost` per registered kind (`factories/registry.ts`: `FACTORIES`, `factoryOrigin`), director, the single loop, key routing, settings subscription (`applyLook` = `looks.set` then `looks.apply(scene)` + host restyle; cutaway forces `pan` layout + clip plane)
