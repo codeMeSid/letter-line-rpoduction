@@ -105,7 +105,10 @@ export class Looks {
     let m = table.get(role);
     if (!m) {
       m = this.make(role);
-      if (clipped) m.clippingPlanes = [this.cutPlane];
+      if (clipped) {
+        m.clippingPlanes = [this.cutPlane];
+        m.clipShadows = true; // the shadow is cut open with the machine
+      }
       table.set(role, m);
     }
     return m;

@@ -86,6 +86,7 @@ describe('Looks', () => {
       expect(clip(plain)).toBeNull();
       expect(cut.material).not.toBe(plain.material);
       expect(l.material('steel', true)).toBe(cut.material); // clipped variants are shared too
+      expect((cut.material as THREE.Material).clipShadows).toBe(true); // the shadow is cut open with the machine
       expect(l.cutPlane.normal.toArray()).toEqual([0, 1, 0]);
     });
     it('outside cutaway nothing is clipped and the cut tag shares the normal material', () => {
