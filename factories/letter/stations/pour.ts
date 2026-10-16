@@ -13,7 +13,8 @@ const GANTRY_X = 62;
 const BEAM_Z = 100;
 const ARM_Z = 85;
 const HOOK_Z = 78; // underside of the hook block
-const REST_X = 40;
+/** Trolley travel stays inboard of the knee braces (they reach x ±40 under the beam; carriage half-width 9). */
+const REST_X = 28;
 const POUR_X = 6;
 const REST_Z = 44; // ladle bowl bottom (bail top just under the hook block)
 const POUR_Z = 34;
@@ -108,7 +109,9 @@ export const pour: StationDef = {
     for (const s of [-1, 1]) {
       const x = s * GANTRY_X;
       group.add(beam(looks, [x, GANTRY_Y, FLOOR], [x, GANTRY_Y, BEAM_Z + 4], 8));
-      group.add(beam(looks, [x, GANTRY_Y, BEAM_Z - 24], [x - s * 20, GANTRY_Y, BEAM_Z - 4], 4));
+      const brace = beam(looks, [x, GANTRY_Y, BEAM_Z - 24], [x - s * 20, GANTRY_Y, BEAM_Z - 4], 4);
+      brace.name = s < 0 ? 'brace-left' : 'brace-right';
+      group.add(brace);
       const foot = housing(looks, 16, 16, 2, 'steel', 0.5);
       foot.position.set(x, GANTRY_Y, FLOOR);
       const stop = housing(looks, 4, 10, 6, 'paint-accent', 0.5);
@@ -120,6 +123,7 @@ export const pour: StationDef = {
     // Trolley with a jib arm reaching over the line, hook block, hoist motor and drum.
     const trolley = new THREE.Group();
     const carriage = housing(looks, 18, 18, 8, 'paint-accent', 1.5);
+    carriage.name = 'trolley';
     carriage.position.set(0, GANTRY_Y, BEAM_Z - 12);
     const arm = beam(looks, [0, GANTRY_Y, ARM_Z], [0, -3, ARM_Z], 6);
     const hook = housing(looks, 7, 7, ARM_Z - 3 - HOOK_Z, 'steel', 1);
@@ -211,6 +215,7 @@ export const pour: StationDef = {
         cable.scale.z = Math.max(0.01, HOOK_Z - bailTop);
         drumAxis.rotation.x = (HOOK_Z - bailTop) * 0.35;
 
+        if (live && t >= 0.3 && shots.once('hiss')) ctx.audio.play('hiss', { x: ctx.origin[0] });
         const pouring = live && t >= 0.3 && t <= 0.8;
         stream.visible = pouring;
         if (pouring) {
@@ -221,7 +226,6 @@ export const pour: StationDef = {
           const hit = world(ctx, lx, 0, SAND_TOP);
           ctx.particles.emit('glow', { pos: hit, count: 1, spread: 1, floor: floorZ(ctx) });
           ctx.particles.emit('ember', { pos: hit, count: 2, vel: [0, 0, 25], spread: 2, floor: floorZ(ctx) });
-          if (shots.once('hiss')) ctx.audio.play('hiss', { x: ctx.origin[0] });
         }
         if (job) product?.shape('poured', ss(0.3, 0.8, t));
 

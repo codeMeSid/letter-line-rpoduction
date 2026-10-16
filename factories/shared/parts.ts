@@ -64,14 +64,14 @@ export function beam(looks: Looks, from: Vec3, to: Vec3, size: number, role: Mat
   return m;
 }
 
-/** Tube through points (gentle bends), with both ends capped so it never reads as hollow. */
-export function pipe(looks: Looks, pts: Vec3[], r: number, role: MaterialRole = 'steel'): THREE.Mesh {
+/** Tube through points (gentle bends), with both ends capped so it never reads as hollow. `radial` = sides (thin coils need fewer). */
+export function pipe(looks: Looks, pts: Vec3[], r: number, role: MaterialRole = 'steel', radial = 12): THREE.Mesh {
   const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'catmullrom', 0.1);
-  const tube = new THREE.TubeGeometry(curve, Math.max(8, pts.length * 12), r, 12, false);
+  const tube = new THREE.TubeGeometry(curve, Math.max(8, pts.length * 12), r, radial, false);
   const z = new THREE.Vector3(0, 0, 1);
   const caps = [0, 1].map((u) => {
     const out = curve.getTangentAt(u).multiplyScalar(u === 0 ? -1 : 1);
-    return new THREE.CircleGeometry(r, 12)
+    return new THREE.CircleGeometry(r, radial)
       .applyQuaternion(new THREE.Quaternion().setFromUnitVectors(z, out))
       .translate(...curve.getPointAt(u).toArray());
   });

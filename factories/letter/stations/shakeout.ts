@@ -4,6 +4,7 @@ import { beam, box, column, flange, gear, hazardBand, housing, lamp, lathe, pane
 import { FLOOR, ease, floorZ, helix, oneShots, ss, stationBase, teardown, world } from './common';
 
 const DECK_Z = -1.8;      // grate bar bottoms; tops stand 1.2 proud of the belt
+const RAIL_BOTTOM = -6;   // conveyor side rails span z -6..1 at y ±26
 const SIDE_Y = 31;        // deck side members, outside the conveyor rails (y ±27.5)
 const FRAME_TOP = FLOOR + 6;
 const SPRING_H = DECK_Z - 1.2 - FRAME_TOP; // frame top → deck spring cap
@@ -35,7 +36,7 @@ export const shakeout: StationDef = {
     const springs = [-28, 28].flatMap((x) => [-SIDE_Y, SIDE_Y].map((y) => {
       const s = new THREE.Group();
       s.position.set(x, y, FRAME_TOP);
-      s.add(pipe(looks, helix(4, 5, 0, SPRING_H, 0, 0, 8), 0.9));
+      s.add(pipe(looks, helix(4, 5, 0, SPRING_H, 0, 0, 6), 0.9, 'steel', 8)); // ~half the triangles of the default tube
       const seat = column(looks, 5, 1, 'steel', 14);
       s.add(seat);
       group.add(s);
@@ -50,11 +51,17 @@ export const shakeout: StationDef = {
       deck.add(bar);
     }
     for (const s of [-1, 1]) {
+      // End members pass under the belt and its side rails (rail bottoms at z -6); corner posts tie them to the side members.
       const end = box(looks, 3, 2 * SIDE_Y + 3, 3, 'steel');
-      end.position.set(s * 36.5, 0, DECK_Z);
+      end.position.set(s * 36.5, 0, RAIL_BOTTOM - 4);
       const side = box(looks, 76, 3, 3, 'paint-accent');
       side.position.set(0, s * SIDE_Y, DECK_Z);
       deck.add(end, side);
+      for (const y of [-SIDE_Y, SIDE_Y]) {
+        const post = box(looks, 3, 3, DECK_Z - (RAIL_BOTTOM - 1), 'steel');
+        post.position.set(s * 36.5, y, RAIL_BOTTOM - 1);
+        deck.add(post);
+      }
       for (const x of [-28, 28]) {
         const cap = column(looks, 5, 1.2, 'steel', 14);
         cap.position.set(x, s * SIDE_Y, DECK_Z - 1.2);
@@ -119,7 +126,7 @@ export const shakeout: StationDef = {
       const skirt = box(looks, 2, 68, 8, 'paint');
       skirt.position.set(s * 40, 0, HOOD_Z - 8);
       group.add(skirt);
-      group.add(beam(looks, [s * 39, 35, FLOOR], [s * 39, 35, HOOD_Z], 5)); // clear of the deck and the hopper cheeks
+      group.add(beam(looks, [s * 37, 36, FLOOR], [s * 37, 36, HOOD_Z], 5)); // inboard of the flared hopper cheeks (x ≥ 40), behind the deck
     }
     const backSkirt = box(looks, 80, 2, 8, 'paint');
     backSkirt.position.set(0, 33, HOOD_Z - 8);
@@ -156,8 +163,7 @@ export const shakeout: StationDef = {
         spin = ease(spin, env > 0.5 ? 45 : 2, dt, 4);
         for (const w of weights) w.rotation.x += spin * dt;
         if (job && product) {
-          product.root.position.z += off;
-          product.root.position.x += off * 0.5;
+          product.root.position.set(job.pos[0] + off * 0.5, job.pos[1], job.pos[2] + off); // absolute: never accumulates
           product.shape('cast', t);
         }
         if (live) {

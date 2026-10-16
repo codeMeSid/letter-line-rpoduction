@@ -13,8 +13,8 @@ export const ss = (a: number, b: number, t: number) => {
   return x * x * (3 - 2 * x);
 };
 
-/** Frame-rate independent ease of `v` toward `target`. */
-export const ease = (v: number, target: number, dt: number, rate = 6) => v + (target - v) * Math.min(1, dt * rate);
+/** Exponential ease of `v` toward `target` (frame-rate independent: two dt/2 steps equal one dt step). */
+export const ease = (v: number, target: number, dt: number, rate = 6) => v + (target - v) * (1 - Math.exp(-rate * dt));
 
 /** The pedestal under the product: a paint housing from the floor to z = -3 standing on a hazard-striped plate (`band` w × d). */
 export function stationBase(looks: Looks, w: number, d: number, band: [number, number] = [w + 10, d + 10]): THREE.Group {
