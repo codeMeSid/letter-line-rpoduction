@@ -1,0 +1,99 @@
+import * as THREE from 'three';
+import { FullScreenQuad, Pass } from 'three/addons/postprocessing/Pass.js';
+
+const FRAG = /* glsl */ `
+#include <packing>
+uniform sampler2D tDiffuse;
+uniform sampler2D tNormal;
+uniform sampler2D tDepth;
+uniform vec2 resolution;
+uniform vec3 edgeColor;
+uniform float cameraNear;
+uniform float cameraFar;
+uniform bool ortho;
+varying vec2 vUv;
+float viewZ(vec2 uv) {
+  float d = texture2D(tDepth, uv).x;
+  return ortho ? orthographicDepthToViewZ(d, cameraNear, cameraFar) : perspectiveDepthToViewZ(d, cameraNear, cameraFar);
+}
+void main() {
+  vec2 px = 1.0 / resolution;
+  float zc = viewZ(vUv);
+  vec3 nc = texture2D(tNormal, vUv).xyz;
+  float dz = 0.0;
+  float dn = 0.0;
+  vec2 offs[4];
+  offs[0] = vec2(px.x, 0.0); offs[1] = vec2(-px.x, 0.0); offs[2] = vec2(0.0, px.y); offs[3] = vec2(0.0, -px.y);
+  for (int i = 0; i < 4; i++) {
+    dz += abs(viewZ(vUv + offs[i]) - zc);
+    dn += distance(texture2D(tNormal, vUv + offs[i]).xyz, nc);
+  }
+  float depthEdge = smoothstep(0.015, 0.04, dz / max(-zc, 1.0));
+  float normalEdge = smoothstep(0.35, 0.7, dn);
+  float e = max(depthEdge, normalEdge);
+  vec4 c = texture2D(tDiffuse, vUv);
+  gl_FragColor = vec4(mix(c.rgb, edgeColor, e), c.a);
+}`;
+const VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+
+/** Line-art look: Sobel on depth + view normals of layer 0 (particles excluded), drawn over the colour. */
+export class EdgePass extends Pass {
+  readonly edgeColor = new THREE.Color();
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
+  private target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
+  private normalMat = new THREE.MeshNormalMaterial();
+  private mat: THREE.ShaderMaterial;
+  private quad: FullScreenQuad;
+
+  constructor(private scene: THREE.Scene, camera: THREE.PerspectiveCamera | THREE.OrthographicCamera) {
+    super();
+    this.camera = camera;
+    this.target.depthTexture = new THREE.DepthTexture(1, 1);
+    this.mat = new THREE.ShaderMaterial({
+      uniforms: {
+        tDiffuse: { value: null }, tNormal: { value: null }, tDepth: { value: null },
+        resolution: { value: new THREE.Vector2(1, 1) }, edgeColor: { value: new THREE.Color() },
+        cameraNear: { value: 1 }, cameraFar: { value: 1000 }, ortho: { value: false },
+      },
+      vertexShader: VERT, fragmentShader: FRAG,
+    });
+    this.quad = new FullScreenQuad(this.mat);
+  }
+
+  setSize(w: number, h: number): void {
+    this.target.setSize(w, h);
+    (this.mat.uniforms.resolution.value as THREE.Vector2).set(w, h);
+  }
+
+  render(renderer: THREE.WebGLRenderer, writeBuffer: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget): void {
+    const cam = this.camera;
+    const mask = cam.layers.mask;
+    const bg = this.scene.background;
+    cam.layers.set(0);
+    this.scene.background = null;
+    this.scene.overrideMaterial = this.normalMat;
+    renderer.setRenderTarget(this.target);
+    renderer.clear();
+    renderer.render(this.scene, cam);
+    this.scene.overrideMaterial = null;
+    this.scene.background = bg;
+    cam.layers.mask = mask;
+    const u = this.mat.uniforms;
+    u.tDiffuse.value = readBuffer.texture;
+    u.tNormal.value = this.target.texture;
+    u.tDepth.value = this.target.depthTexture;
+    u.cameraNear.value = cam.near;
+    u.cameraFar.value = cam.far;
+    u.ortho.value = (cam as THREE.OrthographicCamera).isOrthographicCamera === true;
+    (u.edgeColor.value as THREE.Color).copy(this.edgeColor);
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+    this.quad.render(renderer);
+  }
+
+  dispose(): void {
+    this.target.dispose();
+    this.normalMat.dispose();
+    this.mat.dispose();
+    this.quad.dispose();
+  }
+}
