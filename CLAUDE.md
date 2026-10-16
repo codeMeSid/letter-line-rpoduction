@@ -59,7 +59,7 @@ uses relative imports (vitest has no alias).
 
 - `lib/` — `share.ts` (`encodeShare`/`decodeShare`: `p`, `t`, `s` query params; invalid → null). No kernel/SVG runtime any more.
 - `app/` — `layout.tsx` (no scripts), `page.tsx` (client component, `dynamic(..., { ssr:false })` → Scene),
-  `globals.css` (reset, `.stage` full-viewport canvas host, `.bench-*` overlay), `dev/bench` (→ `components/Bench.tsx`: a swatch per material role, look/theme/quality buttons, spark+sand emitter; add `ROWS` entries) + `dev/sound` (both 404 in production)
+  `globals.css` (reset, `.stage` full-viewport canvas host, `.hud*` panel, `.bench-*` overlay), `dev/bench` (→ `components/Bench.tsx`: a swatch per material role, look/theme/quality buttons, spark+sand emitter; add `ROWS` entries) + `dev/sound` (both 404 in production)
 - `engine/` — pure & unit-tested (no DOM): `types`, `charset`, `settings` (zustand store + `useSettings`), `clock` (WPM/speedMul),
   `events` (typed emitter), `layout` (`layoutStations`: anchors/paths per mode, footprints centred on anchors),
   `line` (`Line` pipeline; `decide` injected; jobs leave as `placing`/`rejected`; phase callbacks flush after each tick; `remove()` → `destroyed`), `input` (`keyToCommand`),
@@ -70,8 +70,12 @@ uses relative imports (vitest has no alias).
   Three runtime (Task 6): `looks` (`Looks`: role → shared material per look; `own(role)` for per-instance; `apply`/`appearance`; background/edge/particle colours; belt texture),
   `renderer` (`createRenderer(root, quality)`: one WebGL canvas), `stage` (`createStage`: lights, env map, tone mapping per look, `fitShadow`),
   `loop` (`createLoop(speedMul, env?)`: the single rAF; dt clamped to `MAX_DT`, sleeps when hidden/idle, `wake()`),
-  `particlesView` (`ParticlesView`: normal + additive `THREE.Points` on `PARTICLE_LAYER`; the camera must enable that layer). Later: director, camera rig, post
-- `shelf/` — `model.ts` pure `Shelf` (lazy auto-wrap at 14, per-row `endedByNewline`, `removeNewline`; `peekLast` → slot | newline | busy | null) + view later
+  `particlesView` (`ParticlesView`: normal + additive `THREE.Points` on `PARTICLE_LAYER`; the camera must enable that layer),
+  `camera` (`CameraRig`: persp for realistic/line-art, ortho for flat/cutaway; overview/follow/cinematic; OrbitControls yields 4 s after the user), `post` (`createPost`: composer chain per look/quality) + `edgePass`,
+  `director` (`Director`: routes commands, owns one `Shelf` per kind, events) + `pace`,
+  `factoryHost` (`FactoryHost(def, origin, deps, mode)`: mounts one `FactoryDef` — floor, conveyors, stations, `Line`, one `ProductHandle` per in-flight job (queued = hidden, backspaced = disposed), `relayout(mode)`/`restyle()`; shelved handles are handed to `ShelfView`)
+- `shelf/` — `model.ts` pure `Shelf` (lazy auto-wrap at 14, per-row `endedByNewline`, `removeNewline`; `peekLast` → slot | newline | busy | null)
+  + `view.ts` `ShelfView` (3D typewriter shelf: newest row = front, lowest plank; older rows rise +z / step back +y; `slotPos`/`span`/`adopt`/`bounds`; owns shelved handles, damps them to their slot, disposes on removal)
 - `audio/` — `types` (binding `SOUND_NAMES`/`SoundName`, `LOOP_NAMES`, `AudioProvider`, `LoopHandle`, `VoiceHandle`),
   `bus` (`AudioBus`: lazy ctx on `unlock()`, `setVolume`/`setEnabled` (master = volume², 0 when off; mute stops loop sources and
   restarts them on unmute), `setListener(xCenter, halfWidth)` +
@@ -87,5 +91,5 @@ uses relative imports (vitest has no alias).
   `conveyor` (`buildConveyor(looks, path, opts)` → `{group, update(simDt, speed), dispose()}`; belt scroll itself is `Looks.scrollBelts`),
   `robotArm` (`RobotArm`: `reach`/`grip`/`tip`/`dispose`). Bench views: `/dev/bench` buttons `view: swatches|line|machine|detail`
 - `fx/` — shotgun, chute, broom, forklift, workers, day/night
-- `hud/` — React HUD + gauges
-- `components/Scene.tsx` — client entry mounting everything (Task 1: placeholder single prism)
+- `hud/` — `Hud.tsx` minimal settings panel (look/pace/camera/theme/quality/sound; Escape or gear toggles; styles `.hud*` in `globals.css`). Gauges later
+- `components/Scene.tsx` — client entry: renderer, looks, stage, post, rig, one `FactoryHost` per registered kind (`factories/registry.ts`: `FACTORIES`, `factoryOrigin`), director, the single loop, key routing, settings subscription (`applyLook` = `looks.set` then `looks.apply(scene)` + host restyle; cutaway forces `pan` layout + clip plane)

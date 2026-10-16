@@ -1,0 +1,58 @@
+import * as THREE from 'three';
+import { describe, expect, it } from 'vitest';
+import { Looks } from '../engine/looks';
+import type { ProductHandle } from '../engine/product';
+import type { Job } from '../engine/types';
+import { Shelf } from './model';
+import { ShelfView } from './view';
+
+const looks = new Looks({ look: 'realistic', theme: 'dark', colorMode: 'accent', quality: 'high' });
+const handle = (): ProductHandle & { disposed: boolean; placedT: number } => {
+  const h = { root: new THREE.Group(), disposed: false, placedT: -1, shape() {}, place(t: number) { h.placedT = t; }, restyle() {}, dispose() { h.disposed = true; } };
+  return h;
+};
+const job = (slotId: number, isSpace = false): Job => ({ id: slotId, slotId, char: 'a', isSpace, special: 'none', product: 'letter', stage: 'polished', phase: 'shelved', stationIndex: 6, progress: 1, pos: [0, 0, 0], defect: false, retries: 0 });
+
+describe('ShelfView', () => {
+  it('slots run +x along the front plank; new rows push older rows up and back', () => {
+    const shelf = new Shelf();
+    const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
+    const a = shelf.reserve('char', 'a');
+    const b = shelf.reserve('char', 'b');
+    const pa = v.slotPos(a.slotId)!;
+    const pb = v.slotPos(b.slotId)!;
+    expect(pb[0]).toBeGreaterThan(pa[0]);
+    expect(pa[1]).toBe(-400);
+    shelf.newline();
+    shelf.reserve('char', 'c');
+    const pa2 = v.slotPos(a.slotId)!;
+    expect(pa2[2]).toBeGreaterThan(pa[2]);
+    expect(pa2[1]).toBeGreaterThan(pa[1]);
+  });
+  it('adopt places the product, damps it to its slot, disposes on removal; spaces are disposed', () => {
+    const shelf = new Shelf();
+    const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
+    const s = shelf.reserve('char', 'a');
+    shelf.markFilled(s.slotId);
+    const h = handle();
+    v.adopt(s.slotId, job(s.slotId), h);
+    expect(h.placedT).toBe(1);
+    for (let i = 0; i < 200; i++) v.update(1 / 60);
+    const want = v.slotPos(s.slotId)!;
+    expect(h.root.position.distanceTo(new THREE.Vector3(...want))).toBeLessThan(0.05);
+    shelf.remove(s.slotId);
+    v.update(1 / 60);
+    expect(h.disposed).toBe(true);
+    const sp = shelf.reserve('space', '');
+    const hs = handle();
+    v.adopt(sp.slotId, job(sp.slotId, true), hs);
+    expect(hs.disposed).toBe(true);
+  });
+  it('span covers the plank width at the front row', () => {
+    const v = new ShelfView(new THREE.Group(), new Shelf(), [26, 8, 32], looks, [100, -400, 0]);
+    const s = v.span();
+    expect(s.x0).toBe(100);
+    expect(s.x1).toBeCloseTo(100 + v.width, 6);
+    expect(s.y).toBe(-400);
+  });
+});
