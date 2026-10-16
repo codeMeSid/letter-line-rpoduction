@@ -36,28 +36,38 @@ export class RobotArm {
     this.group.add(base, collar, this.yawG);
     this.yawG.add(turret, this.shoulderG);
     this.shoulderG.position.z = d.shoulderZ;
+    // Joint motors are columns along y whose base sits flush on the link's -y face and extend outward
+    // (rotation.x = π/2 sends a column's +z to −y, so position.y is the face and the body spans y∈[face−len, face]).
     const upperLink = housing(looks, d.upper, 14, 14, 'paint-accent', 4);
+    upperLink.name = 'link-upper';
     upperLink.position.set(d.upper / 2, 0, -7);
     const motor = column(looks, 9, 22, 'steel', 20);
+    motor.name = 'motor-shoulder';
     motor.rotation.x = Math.PI / 2;
-    motor.position.set(0, -11, 0);
-    // Cable conduit riding along the top of each link.
-    const conduit = beam(looks, [12, 5, 9.5], [d.upper - 12, 5, 9.5], 3, 'steel');
+    motor.position.set(0, -7, 0);
+    // Cable conduits ride on the flat of each link's top (the rounded edges fall away at |y| > width/2 - radius).
+    const conduit = beam(looks, [12, 1.5, 8.5], [d.upper - 12, 1.5, 8.5], 3, 'steel');
+    conduit.name = 'conduit-upper';
     this.shoulderG.add(upperLink, motor, conduit, this.elbowG);
     this.elbowG.position.x = d.upper;
     const foreLink = housing(looks, d.fore, 11, 11, 'paint-accent', 3.5);
+    foreLink.name = 'link-fore';
     foreLink.position.set(d.fore / 2, 0, -5.5);
     const elbowMotor = column(looks, 7, 18, 'steel', 20);
+    elbowMotor.name = 'motor-elbow';
     elbowMotor.rotation.x = Math.PI / 2;
-    elbowMotor.position.set(0, -9, 0);
-    const foreConduit = beam(looks, [10, 4, 8], [d.fore - 8, 4, 8], 2.5, 'steel');
+    elbowMotor.position.set(0, -5.5, 0);
+    const foreConduit = beam(looks, [10, 0.75, 6.75], [d.fore - 8, 0.75, 6.75], 2.5, 'steel');
+    foreConduit.name = 'conduit-fore';
     this.elbowG.add(foreLink, elbowMotor, foreConduit, this.wristG);
     this.wristG.position.x = d.fore;
     const wrist = housing(looks, WRIST - 8, 9, 9, 'steel', 2);
+    wrist.name = 'link-wrist';
     wrist.position.set((WRIST - 8) / 2, 0, -4.5);
     const wristMotor = column(looks, 6, 12, 'steel', 16); // wrist roll drive (cosmetic)
+    wristMotor.name = 'motor-wrist';
     wristMotor.rotation.x = Math.PI / 2;
-    wristMotor.position.set(0, -6, 0);
+    wristMotor.position.set(0, -4.5, 0);
     this.wristG.add(wrist, wristMotor, this.tip);
     for (const s of [-1, 1]) {
       const f = housing(looks, 8, 2, 7, 'rubber', 0.5);

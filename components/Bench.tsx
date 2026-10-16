@@ -188,6 +188,7 @@ export default function Bench() {
     const rows = ROWS.map((row) => row(ctx));
 
     let frame: Box = VIEWS.swatches.frame;
+    CUT_PLANE.constant = -VIEWS.swatches.cut; // module-level plane: a remount must not inherit the last view's cut
     const rig = new CameraRig({ overview: () => frame, newest: () => null, busiest: () => null, followSpan: () => 400 });
     const post = createPost(r.gl, r.scene);
     const sync = () => {

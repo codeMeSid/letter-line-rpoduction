@@ -109,7 +109,8 @@ export function lathe(looks: Looks, profile: [number, number][], role: MaterialR
   return looks.part(g, role);
 }
 
-/** Ring plate (radius r, 2 thick) with `bolts` instanced hex bolt heads on a circle of 0.8r; group bottom at z=0. */
+/** Ring plate (radius r, 2 thick) with a 2.5 tall pipe neck (group height 2 + 2.5 = 4.5) and `bolts` instanced
+ *  hex bolt heads (1.5 tall, on the plate at z=2) on a circle of 0.8r; group bottom at z=0. The bore stays open (radius 0.4r). */
 export function flange(looks: Looks, r: number, bolts: number, role: MaterialRole = 'steel'): THREE.Group {
   const g = new THREE.Group();
   const ri = r * 0.4;
