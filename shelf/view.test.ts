@@ -29,7 +29,27 @@ describe('ShelfView', () => {
     expect(pa2[2]).toBe(pa[2]);
     expect(pa2[1]).toBe(pa[1] + 40);
   });
-  it('shows the 3 newest rows: the 4th-oldest row is hidden (kept, not disposed) and gets no plank', () => {
+  it('draws a plank group per row; a new row makes older planks glide back', () => {
+    const shelf = new Shelf();
+    const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
+    v.update(0);
+    const first = shelf.rows[0];
+    expect(v.rowEnd(first)![1]).toBe(-400);
+    shelf.newline();
+    v.update(1 / 60);
+    const moved = v.rowEnd(first)![1] + 400;
+    expect(moved).toBeGreaterThan(0);
+    expect(moved).toBeLessThan(40);
+    expect(v.rowEnd(shelf.rows[1])![1]).toBe(-400); // the new row appears in place at the front
+    v.update(2);
+    expect(v.rowEnd(first)![1]).toBeCloseTo(-360, 3);
+    for (let r = 0; r < 3; r++) shelf.newline();
+    v.update(0);
+    expect(shelf.rows).toHaveLength(5);
+    const planks = v.group.children.filter((o) => (o as THREE.Group).isGroup && o.children.some((c) => c.userData.role === 'wood'));
+    expect(planks).toHaveLength(5); // every row is drawn: nothing is hidden any more
+  });
+  it('shows every row\'s products; a row that left the shelf loses its plank (geometry disposed)', () => {
     const shelf = new Shelf();
     const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
     const hs = [0, 1, 2, 3].map((r) => {
@@ -41,29 +61,80 @@ describe('ShelfView', () => {
       return h;
     });
     v.update(1 / 60);
-    expect(hs.map((h) => h.root.visible)).toEqual([false, true, true, true]);
-    expect(hs[0].disposed).toBe(false);
-    const planks = v.group.children[0].children.filter((o) => (o as THREE.Mesh).isMesh && o.userData.role === 'wood');
-    expect(planks).toHaveLength(3);
+    expect(hs.map((h) => h.root.visible)).toEqual([true, true, true, true]);
+    const oldest = shelf.rows[0];
+    let disposed = 0;
+    v.group.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.addEventListener('dispose', () => disposed++); });
+    shelf.shipRow();
+    v.update(1 / 60);
+    expect(v.rowEnd(oldest)).toBeNull();
+    expect(disposed).toBe(5); // plank, three posts and foot of the shipped row
   });
-  it('with 8 rows every drawn plank and post stays in front of the robot carriage (span.y + 150 - 20)', () => {
+  it('releaseRow hands over the plank and its products undisposed', () => {
     const shelf = new Shelf();
     const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
-    for (let r = 0; r < 8; r++) {
+    const slots = ['a', 'b'].map((ch) => shelf.reserve('char', ch));
+    shelf.newline();
+    const c = shelf.reserve('char', 'c');
+    const hs = [...slots, c].map((s) => {
+      shelf.markFilled(s.slotId);
+      const h = handle();
+      v.adopt(s.slotId, job(s.slotId), h);
+      return h;
+    });
+    v.update(1 / 60);
+    const row0 = shelf.rows[0];
+    const cBefore = v.slotPos(c.slotId);
+    let disposed = 0;
+    v.group.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.addEventListener('dispose', () => disposed++); });
+    const load = v.releaseRow(row0)!;
+    expect(load.handles).toEqual([hs[0], hs[1]]);
+    expect(hs.slice(0, 2).every((h) => !h.disposed)).toBe(true);
+    expect(hs[0].root.parent).toBe(load.group);
+    expect(hs[1].root.parent).toBe(load.group);
+    expect(load.group.parent).toBeNull();
+    const woods = (root: THREE.Object3D) => { let n = 0; root.traverse((o) => { if (o.userData.role === 'wood') n++; }); return n; };
+    expect(woods(load.group)).toBe(1);
+    expect(woods(v.group)).toBe(1); // only the second row's plank is left in the view
+    expect(v.slotPos(c.slotId)).toEqual(cBefore);
+    expect(hs[2].root.parent).toBe(v.group);
+    v.update(1 / 60); // between release and shipRow the view must not redraw the released row
+    expect(woods(v.group)).toBe(1);
+    expect(v.rowEnd(row0)).toBeNull();
+    expect(v.releaseRow(row0)).toBeNull();
+    expect(v.release(slots[0].slotId)).toBeNull(); // the products left with the load
+    shelf.shipRow();
+    v.update(1 / 60);
+    expect(disposed).toBe(0); // the view never disposes what it handed over
+  });
+  it('rowEnd is the plank +x end at plank top', () => {
+    const shelf = new Shelf();
+    const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [100, -400, 5]);
+    shelf.reserve('char', 'a');
+    expect(v.rowEnd(shelf.rows[0])).toEqual([100 + v.width, -400, 5 + 18]);
+    expect(v.rowEnd([])).toBeNull(); // unknown row
+    v.setOrigin([40, -300, 0]);
+    v.update(0);
+    expect(v.rowEnd(shelf.rows[0])).toEqual([40 + v.width, -300, 18]); // planks rebuilt snapped at the new origin
+  });
+  it('with 4 rows (3 kept + the one the forklift is fetching) every plank and post stays behind the robot rail centre line (span.y + 150)', () => {
+    const shelf = new Shelf();
+    const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
+    for (let r = 0; r < 4; r++) {
       if (r) shelf.newline();
       shelf.reserve('char', 'a');
     }
-    expect(shelf.rows).toHaveLength(8);
+    expect(shelf.rows).toHaveLength(4);
     v.update(0);
     v.group.updateMatrixWorld(true);
-    const limit = v.span().y + 150 - 20; // robot rail at span.y + 150, carriage ±20
+    const limit = v.span().y + 150; // robot rail; the carriage face (limit - 20) is only grazed by 1 unit, at floor level below the carriage
     let n = 0;
     v.group.traverse((o) => {
       if (!(o as THREE.Mesh).isMesh) return;
       n++;
       expect(new THREE.Box3().setFromObject(o).max.y).toBeLessThan(limit);
     });
-    expect(n).toBeGreaterThanOrEqual(3 * 4); // a plank and three posts per drawn row
+    expect(n).toBe(4 * 5); // a plank, three posts and a foot per row
   });
   it('row 0 slots stand just in front of the plank (back face flush with its front face)', () => {
     const shelf = new Shelf();

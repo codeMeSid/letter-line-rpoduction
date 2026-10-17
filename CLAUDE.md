@@ -76,8 +76,9 @@ uses relative imports (vitest has no alias).
   `director` (`Director`: routes commands, owns one `Shelf` per kind, events; placing jobs count against the pace's `maxInFlight`) + `pace`,
   `factoryHost` (`FactoryHost(def, origin, deps, mode)`: mounts one `FactoryDef` — floor, conveyors, stations, `Line`, one `ProductHandle` per in-flight job (queued = hidden, backspaced = disposed), `relayout(mode)`/`restyle()`; `newest()` = newest non-queued line job, the placing job only when the line is empty; shelved handles are handed to `ShelfView`)
 - `shelf/` — `model.ts` pure `Shelf` (lazy auto-wrap at 14, per-row `endedByNewline`, `removeNewline`; `peekLast` → slot | newline | busy | null)
-  + `view.ts` `ShelfView` (R24: flat tray in front of the line, `SHELF_FRONT` 220; only the 3 newest rows are shown (`VISIBLE_ROWS`), newest = front plank,
-  older rows step back +y on the same level toward the robot rail behind; `slotPos`/`span`/`adopt`/`bounds`; owns shelved handles, damps them to their slot, disposes on removal)
+  + `view.ts` `ShelfView` (R24: flat tray in front of the line, `SHELF_FRONT` 220; every row has its own plank group keyed by the model's row array (damped y), newest = front plank,
+  older rows glide back +y on the same level toward the robot rail behind; `slotPos`/`span`/`adopt`/`bounds`; owns shelved handles, damps them to their slot, disposes on removal;
+  forklift hand-over: `releaseRow(row)` → `{group, handles}` (plank + products, undisposed), `rowEnd(row)` = the plank's +x end at its top)
 - `audio/` — `types` (binding `SOUND_NAMES`/`SoundName`, `LOOP_NAMES`, `AudioProvider`, `LoopHandle`, `VoiceHandle`),
   `bus` (`AudioBus`: lazy ctx on `unlock()`, `setVolume`/`setEnabled` (master = volume², 0 when off; mute stops loop sources and
   restarts them on unmute), `setListener(xCenter, halfWidth)` +
