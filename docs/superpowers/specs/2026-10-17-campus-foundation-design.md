@@ -55,8 +55,9 @@ Letter roles of the future factories:
 **Plots.** Plots sit side by side along +x in `PRODUCT_KINDS` order, with a 160-wide road between
 neighbours and a main road along the front (−y).
 - A built factory's plot is the **widest layout it can take over all four layout modes**, so its origin
-  never moves when the layout changes. Plot width = max(layout width, shelf width), plus 70 pad on the left
-  and 260 on the right (the forklift dock).
+  never moves when the layout changes. Plot width = max(layout width, shelf width), plus 110 pad on the left
+  (the `all` layout's left U-turn sits 30 left of the origin, and the floor pad is 70) and 260 on the right
+  (the forklift dock).
 - An unbuilt factory gets a 900 × 700 plot.
 - `campusLayout` is pure. It takes plot sizes and returns plot x-ranges and factory origins.
 
