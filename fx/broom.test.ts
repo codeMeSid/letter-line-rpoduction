@@ -117,6 +117,34 @@ describe('Broom', () => {
     expect(offPark).toBe(0); // still on the (park.x, y) leg: 40 units at 120/s = 0.33 s
     expect(t.broom.rover.position.y).toBeGreaterThan(-400);
   });
+  it('a chained sweep on another row changes rows at the park x, not through the shelf', () => {
+    const t = mk();
+    const order: string[] = [];
+    t.broom.sweep(() => [300, -360, 18], 'debris', () => order.push('a'));
+    t.broom.sweep(() => [320, -320, 18], 'gap', () => order.push('b')); // queued behind a, one row further back
+    const rowChangesAt: number[] = [];
+    let prev = t.broom.rover.position.y;
+    t.run(14, () => {
+      const { x, y } = t.broom.rover.position;
+      if (Math.abs(y - prev) > 1e-6) rowChangesAt.push(x);
+      prev = y;
+    });
+    expect(order).toEqual(['a', 'b']);
+    expect(rowChangesAt.length).toBeGreaterThan(10); // park -> row a, row a -> row b, home
+    for (const x of rowChangesAt) expect(Math.abs(x - 500)).toBeLessThan(2.5); // park.x, give or take one 60 fps step (2 units); the old behaviour changed rows at x ~ 314
+  });
+  it('chained sweeps on the same row drive straight along it', () => {
+    const t = mk();
+    let afterA = false;
+    let doneB = false;
+    t.broom.sweep(() => [300, -360, 18], 'gap', () => { afterA = true; });
+    t.broom.sweep(() => [260, -360, 18], 'gap', () => { doneB = true; });
+    let maxX = 0;
+    t.run(6, () => { if (afterA && !doneB) maxX = Math.max(maxX, t.broom.rover.position.x); });
+    expect(doneB).toBe(true);
+    expect(maxX).toBeGreaterThan(0);
+    expect(maxX).toBeLessThan(320); // from slot A (x 314) it goes on to slot B (274): never back toward park.x (500)
+  });
   it('is a real rover: body, cover, four wheels, roller on two arms, beacon; all role-tagged', () => {
     const t = mk();
     const ms = meshes(t.broom.group);

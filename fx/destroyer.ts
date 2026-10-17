@@ -30,8 +30,8 @@ export class Destroyer implements BackspaceHandler {
   private frags: Fragments;
   /** Products handed over by a host/shelf and waiting for their shot: disposed on hit, or on dispose(). */
   private held = new Set<ProductHandle>();
-  /** Debris heaps waiting for the broom; each follows its slot as rows step back. `at0` = the slot spot the heap was built around. */
-  private piles = new Map<number, { pile: Pile; at: () => Vec3 | null; at0: Vec3 }>();
+  /** Debris heaps waiting for the broom, keyed `kind:slotId` (slot ids are counted per shelf); each follows its slot as rows step back. `at0` = the spot the heap was built around. */
+  private piles = new Map<string, { pile: Pile; at: () => Vec3 | null; at0: Vec3 }>();
 
   constructor(private d: DestroyerDeps) {
     this.gun = new Shotgun({ looks: d.looks, particles: d.particles, audio: d.audio, flash: d.flash, shake: d.shake });
@@ -128,16 +128,18 @@ export class Destroyer implements BackspaceHandler {
   private leaveDebris(kind: ProductKind, slotId: number, host: FactoryHost, site: FactorySite): void {
     const { director } = this.d;
     const sv = host.shelfView;
+    const at = sv.slotPos(slotId);
+    if (!at) { this.removeSlot(kind, slotId); return; } // the slot is gone: nothing to leave a heap on
     director.shelf(kind).markDebris(slotId);
     director.events.emit('slot:debris', { kind, slotId });
     const st = host.def.product.shatter;
-    const at: Vec3 = sv.slotPos(slotId) ?? [0, 0, 0];
+    const key = `${kind}:${slotId}`;
     const pile = this.frags.pile(st.fragments.role, at, Math.max(3, Math.ceil(st.fragments.count / 2)), st.fragments.size, !!st.puddle);
     this.group.add(pile.group);
-    this.piles.set(slotId, { pile, at: () => sv.slotPos(slotId), at0: at });
+    this.piles.set(key, { pile, at: () => sv.slotPos(slotId), at0: at });
     site.broom.sweep(() => sv.slotPos(slotId), 'debris', () => {
       pile.dispose();
-      this.piles.delete(slotId);
+      this.piles.delete(key);
       this.removeSlot(kind, slotId);
     });
   }

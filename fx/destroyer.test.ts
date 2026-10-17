@@ -269,6 +269,20 @@ describe('Destroyer', () => {
     expect(removed).toHaveLength(1);
     expect(t.site.broom.busy).toBe(false); // and it found its way back to the moved park spot
   });
+  it('debris for a slot that vanished while the gun lined up leaves no heap and no sweep', () => {
+    const t = setup({ backspaceStyle: 'debris' });
+    t.type('a');
+    t.shelve();
+    const shelf = t.director.shelf('letter');
+    const debris: number[] = [];
+    t.director.events.on('slot:debris', ({ slotId }) => debris.push(slotId));
+    t.bs();
+    shelf.remove(shelf.rows[0][0].id); // gone before the shot lands
+    expect(() => t.step(3)).not.toThrow();
+    expect(debris).toHaveLength(0);
+    expect(pileChunks(t.d.group)).toHaveLength(0);
+    expect(t.site.broom.busy).toBe(false);
+  });
   it('dispose mid-debris frees the pile', () => {
     const t = setup({ backspaceStyle: 'debris' });
     t.type('a');

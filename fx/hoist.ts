@@ -27,6 +27,7 @@ const HOME_UP = 160;
 const CABLE_UP = 800;     // the cable runs this far above the ceiling, out of frame
 const OPEN = (35 * Math.PI) / 180;
 const BIN_CAP = 6;
+const BIN_FLOOR = 11;     // bin floor top above binPos z (factories/shared/building.ts); products land on or above it
 const BLOCK_TOP = 31;     // rig-local: top of the cable socket
 const BLINK = 4;          // lamp flashes per second
 
@@ -133,6 +134,10 @@ export class Hoist {
   get busy(): boolean { return this.state !== 'idle' || this.queue.length > 0 || this.homeT >= 0; }
 
   setAnchors(a: HoistAnchors): void {
+    // the bin (and everything binned) moves with the building: its children are stored relative to it
+    this.bin.position.x += a.binPos[0] - this.a.binPos[0];
+    this.bin.position.y += a.binPos[1] - this.a.binPos[1];
+    this.bin.position.z += a.binPos[2] - this.a.binPos[2];
     this.a = a;
     if (!this.busy) { this.pos.copy(this.home()); this.render(); } // a mid-trip claw reads the anchors as it goes
   }
@@ -143,7 +148,7 @@ export class Hoist {
     this.group.attach(h.root);
     this.queue.push({
       h, onDone,
-      land: { off: [rnd(-14, 14), rnd(-10, 10), rnd(6, 20)], rot: [rnd(-0.5, 0.5), rnd(-0.5, 0.5), rnd(-1.2, 1.2)] },
+      land: { off: [rnd(-14, 14), rnd(-10, 10), BIN_FLOOR + rnd(1, 11)], rot: [rnd(-0.35, 0.35), rnd(-0.35, 0.35), rnd(-1.2, 1.2)] },
     });
     if (this.state === 'idle') this.begin();
   }

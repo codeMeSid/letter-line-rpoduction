@@ -12,6 +12,7 @@ const JIGGLE = 3;           // units, along x
 const JIGGLE_HZ = 6;
 const TURN = 14;            // yaw smoothing rate, 1 / s
 const STANDOFF = 14;        // the rover stops this far +x of the slot so its roller (at the front, -x) lands on it
+const ROW_EPS = 1;          // two y values closer than this are the same row
 const PARK_POLL = 0.5;      // an idle broom re-reads its park spot this often (a relayout moves the shelf)
 
 type State = 'idle' | 'drive' | 'sweep' | 'home';
@@ -41,7 +42,6 @@ export class Broom {
   private yaw = 0;
   private yawTo = 0;
   private leg = 0;
-  private legX = 0;
   private st = 0;
   private parkT = 0;
   private parked = new THREE.Vector3();
@@ -99,8 +99,13 @@ export class Broom {
         const a = this.cur!.at();
         if (!a) { this.finish(); break; } // the slot vanished
         this.pos.z = a[2];
-        if (this.leg === 0 && this.moveTo(this.legX, a[1], dt, true)) this.leg = 1;
-        if (this.leg === 1 && this.moveTo(a[0] + STANDOFF, a[1], dt, true)) this.beginSweep(a);
+        // rows are crossed at the park x only (shelved products stand in the other rows): along the current row
+        // back to park.x, then to the target row, then along it to the slot. Same row: straight there.
+        let left = dt; // time left in this frame after finishing a leg, spent on the next one
+        if (this.leg === 0 && Math.abs(a[1] - this.pos.y) < ROW_EPS) this.leg = 2;
+        if (this.leg === 0 && (left = this.moveTo(this.park()[0], this.pos.y, left, true)) >= 0) this.leg = 1;
+        if (this.leg === 1 && left >= 0 && (left = this.moveTo(this.park()[0], a[1], left, true)) >= 0) this.leg = 2;
+        if (this.leg === 2 && left >= 0 && this.moveTo(a[0] + STANDOFF, a[1], left, true) >= 0) this.beginSweep(a);
         break;
       }
       case 'sweep': {
@@ -108,7 +113,7 @@ export class Broom {
         if (!a) { this.finish(); break; }
         this.pos.z = a[2];
         // the slot may step back while we sweep: follow it, and only sweep while on it
-        if (this.moveTo(a[0] + STANDOFF, a[1], dt, false)) {
+        if (this.moveTo(a[0] + STANDOFF, a[1], dt, false) >= 0) {
           this.st += dt;
           this.roller.rotation.y += ROLLER_RATE * dt;
           if (this.st >= SWEEP_T[this.cur!.kind]) this.finish();
@@ -118,8 +123,9 @@ export class Broom {
       case 'home': {
         const p = this.park();
         this.pos.z = p[2];
-        if (this.leg === 0 && this.moveTo(p[0], this.pos.y, dt, true)) this.leg = 1;
-        if (this.leg === 1 && this.moveTo(p[0], p[1], dt, true)) { this.state = 'idle'; this.yawTo = 0; this.parkT = 0; }
+        let left = dt;
+        if (this.leg === 0 && (left = this.moveTo(p[0], this.pos.y, left, true)) >= 0) this.leg = 1;
+        if (this.leg === 1 && left >= 0 && this.moveTo(p[0], p[1], left, true) >= 0) { this.state = 'idle'; this.yawTo = 0; this.parkT = 0; }
         break;
       }
     }
@@ -138,7 +144,6 @@ export class Broom {
     this.cur = req;
     this.state = 'drive';
     this.leg = 0;
-    this.legX = this.pos.x; // first change rows at the current x, then drive along the row
   }
 
   private beginSweep(a: Vec3): void {
@@ -161,17 +166,17 @@ export class Broom {
     this.leg = 0;
   }
 
-  /** Drive toward (x, y) at SPEED facing the way we go; true on arrival. */
-  private moveTo(x: number, y: number, dt: number, turn: boolean): boolean {
+  /** Drive toward (x, y) at SPEED facing the way we go. On arrival returns the time left over from `dt` (>= 0), else -1. */
+  private moveTo(x: number, y: number, dt: number, turn: boolean): number {
     const dx = x - this.pos.x;
     const dy = y - this.pos.y;
     const d = Math.hypot(dx, dy);
     const step = SPEED * dt;
-    if (d <= step) { this.pos.x = x; this.pos.y = y; return true; }
+    if (d <= step) { this.pos.x = x; this.pos.y = y; return dt - d / SPEED; }
     this.pos.x += (dx / d) * step;
     this.pos.y += (dy / d) * step;
     if (turn) this.yawTo = Math.atan2(dy, dx) + Math.PI; // the front is -x
-    return false;
+    return -1;
   }
 
   private render(dt: number): void {

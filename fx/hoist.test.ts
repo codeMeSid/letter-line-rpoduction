@@ -45,8 +45,8 @@ describe('Hoist', () => {
     const p = h.root.position;
     expect(Math.abs(p.x - A.binPos[0])).toBeLessThan(16);
     expect(Math.abs(p.y - A.binPos[1])).toBeLessThan(12);
-    expect(p.z).toBeGreaterThanOrEqual(A.binPos[2] + 6);
-    expect(p.z).toBeLessThanOrEqual(A.binPos[2] + 20);
+    expect(p.z).toBeGreaterThanOrEqual(A.binPos[2] + 11); // on or above the bin floor top (z 11 in building.ts)
+    expect(p.z).toBeLessThanOrEqual(A.binPos[2] + 22);
     t.run(1); // the claw is back home
     expect(t.hoist.busy).toBe(false);
   });
@@ -131,8 +131,32 @@ describe('Hoist', () => {
     t.run(4);
     expect(done).toBe(1);
     expect(h.root.parent).toBe(t.hoist.bin);
-    expect(Math.abs(h.root.position.x - 150)).toBeLessThan(16);
+    t.hoist.group.updateMatrixWorld(true);
+    expect(Math.abs(h.root.getWorldPosition(new THREE.Vector3()).x - 150)).toBeLessThan(16); // in the moved bin
     expect(t.hoist.busy).toBe(false);
+  });
+  it('the bin and what is in it follow a layout change; later products land in the moved bin', () => {
+    const t = mk();
+    const a = handle();
+    t.hoist.reject(a);
+    t.run(3.4);
+    const moved: HoistAnchors = { chuteTop: [30, 266, 150], chuteBottom: [170, 266, 58], binPos: [220, 266, 0], ceil: 320 };
+    const inBin = (h: ReturnType<typeof handle>) => {
+      t.hoist.group.updateMatrixWorld(true);
+      const w = h.root.getWorldPosition(new THREE.Vector3());
+      expect(Math.abs(w.x - moved.binPos[0])).toBeLessThan(16);
+      expect(Math.abs(w.y - moved.binPos[1])).toBeLessThan(12);
+      expect(w.z).toBeGreaterThanOrEqual(moved.binPos[2] + 11);
+      expect(w.z).toBeLessThanOrEqual(moved.binPos[2] + 22);
+    };
+    t.hoist.setAnchors(moved);
+    inBin(a);
+    const b = handle();
+    t.hoist.reject(b);
+    t.run(3.4);
+    expect(b.root.parent).toBe(t.hoist.bin);
+    inBin(b);
+    inBin(a);
   });
   it('restyle reaches the carried and the binned products', () => {
     const t = mk();

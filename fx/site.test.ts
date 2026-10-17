@@ -33,6 +33,8 @@ describe('FactorySite', () => {
     site.rebuild();
     expect(site.hoist).toBe(hoist);
     expect(site.broom).toBe(broom);
+    expect(hoist.group.parent).toBe(site.group);
+    expect(broom.group.parent).toBe(site.group);
     expect(Math.abs(home().x - site.building.chuteTop[0])).toBeLessThan(12);
     site.update(0.1, 0);
     site.dispose();
