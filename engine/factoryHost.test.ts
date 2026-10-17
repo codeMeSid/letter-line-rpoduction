@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { AudioBus } from '../audio/bus';
+import { PAD_RIGHT } from './campus';
 import { Director } from './director';
 import type { FactoryDef } from './factory';
-import { FactoryHost } from './factoryHost';
+import { FactoryHost, FLOOR_PAD } from './factoryHost';
 import { Looks, type LookOptions } from './looks';
 import { ParticleSystem } from './particles';
 import type { ProductHandle, ProductModel } from './product';
@@ -74,6 +75,15 @@ const meshes = (root: THREE.Object3D): THREE.Mesh[] => {
 const clip = (m: THREE.Mesh) => (m.material as THREE.Material).clippingPlanes;
 
 describe('FactoryHost', () => {
+  it('floorBox pads the layout + shelf by FLOOR_PAD, and the +x side by the dock pad', () => {
+    const { host } = setup();
+    const f = host.floorBox();
+    const b = host.bounds();
+    expect(f.x0).toBe(b.min[0] - FLOOR_PAD);
+    expect(f.x1).toBe(b.max[0] + PAD_RIGHT);
+    expect(f.y0).toBe(b.min[1] - FLOOR_PAD);
+    expect(f.y1).toBe(b.max[1] + FLOOR_PAD);
+  });
   it('creates a handle per job, positions it, hides queued jobs', () => {
     const f = setup();
     for (const c of 'abc') f.director.handle({ type: 'char', char: c });

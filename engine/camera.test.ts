@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { CameraRig, FOV, fitView, viewDir } from './camera';
+import { FLIGHT_MS } from './campus';
 import { LOOKS, type Vec3 } from './types';
 
 const TAN = Math.tan((FOV * Math.PI) / 360);
@@ -138,5 +139,55 @@ describe('CameraRig', () => {
     expect(rig.isOrtho()).toBe(true);
     rig.setLook('realistic');
     expect(rig.isOrtho()).toBe(false);
+  });
+});
+
+describe('CameraRig.fly', () => {
+  const mk = (box: { min: Vec3; max: Vec3 }) => {
+    const ref = { box };
+    const rig = new CameraRig({ overview: () => ref.box, newest: () => null, busiest: () => null, followSpan: () => 400 });
+    rig.setLook('flat');
+    rig.resize(1280, 800, 1);
+    rig.snap();
+    return { rig, ref };
+  };
+  const A = { min: [0, -300, 0] as Vec3, max: [900, 0, 100] as Vec3 };
+  const B = { min: [3000, -300, 0] as Vec3, max: [3900, 0, 100] as Vec3 };
+  it('pulls out on A, pans, and lands exactly on the new overview', () => {
+    const { rig, ref } = mk(A);
+    const start = rig.center();
+    ref.box = B;
+    rig.fly(A, 1000);
+    expect(rig.flying).toBe(true);
+    rig.update(1 / 60, 1000);
+    expect(rig.center().x).toBeCloseTo(start.x, 6);
+    rig.update(1 / 60, 1000 + FLIGHT_MS * 0.5);
+    expect(rig.center().halfWidth).toBeGreaterThan(start.halfWidth * 1.2);
+    rig.update(1 / 60, 1000 + FLIGHT_MS);
+    expect(rig.flying).toBe(false);
+    expect(rig.center().x).toBeCloseTo(3450, 3);
+    expect(rig.center().halfWidth).toBeCloseTo(start.halfWidth, 3);
+  });
+  it('fly twice: the second flight starts from the current pose (no jump)', () => {
+    const { rig, ref } = mk(A);
+    ref.box = B;
+    rig.fly(A, 0);
+    rig.update(1 / 60, FLIGHT_MS * 0.5);
+    const mid = rig.center();
+    ref.box = A;
+    rig.fly(B, FLIGHT_MS * 0.5);
+    rig.update(1 / 60, FLIGHT_MS * 0.5);
+    expect(rig.center().x).toBeCloseTo(mid.x, 6);
+    expect(rig.center().halfWidth).toBeCloseTo(mid.halfWidth, 6);
+  });
+  it('shake offsets the camera briefly, then settles back', () => {
+    const { rig } = mk(A);
+    rig.update(1 / 60, 0);
+    const p0 = rig.active().position.clone();
+    rig.shake(1);
+    rig.update(1 / 60, 16);
+    expect(rig.active().position.distanceTo(p0)).toBeGreaterThan(0);
+    for (let i = 0; i < 120; i++) rig.update(1 / 60, 32 + i * 16);
+    expect(rig.active().position.distanceTo(p0)).toBeLessThan(0.01);
   });
 });

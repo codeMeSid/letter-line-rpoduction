@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { AudioBus } from '@/audio/bus';
 import { CameraRig, type CameraMode } from '@/engine/camera';
+import { SITE_SIZE, SITE_Y0 } from '@/engine/campus';
 import { Director } from '@/engine/director';
 import { FactoryHost } from '@/engine/factoryHost';
 import { keyRoute, keyToCommand } from '@/engine/input';
@@ -18,7 +19,10 @@ import { createRenderer } from '@/engine/renderer';
 import { settingsStore, type Settings } from '@/engine/settings';
 import { createStage } from '@/engine/stage';
 import { PRODUCT_KINDS, type LayoutMode, type ProductKind, type Vec3 } from '@/engine/types';
-import { FACTORIES, factoryOrigin } from '@/factories/registry';
+import { FACTORIES, factoryOrigin, PLOTS, plotOf } from '@/factories/registry';
+import { ConstructionSite } from '@/fx/construction';
+import { buildGround } from '@/fx/ground';
+import { FactorySite } from '@/fx/site';
 import Hud from '@/hud/Hud';
 
 const lookOpts = (s: Settings): LookOptions => ({ look: s.look, theme: s.theme, colorMode: s.colorMode, quality: s.quality });
@@ -54,13 +58,20 @@ export default function Scene() {
       const def = FACTORIES[kind];
       if (def) hosts.set(kind, new FactoryHost(def, factoryOrigin(kind), { parent: world, looks, director, particles, audio, settings, now }, effLayout(s0)));
     }
-    const active = () => hosts.get(settings().product) ?? null;
-    const overview = (): { min: Vec3; max: Vec3 } => {
-      const h = active();
-      if (h) return h.bounds();
-      const [x, y] = factoryOrigin(settings().product);
-      return { min: [x, y - 400, 0], max: [x + 800, y, 60] };
+    const ground = buildGround(looks, PLOTS);
+    world.add(ground.group);
+    const sites = new Map<ProductKind, FactorySite>();
+    for (const [kind, host] of hosts) sites.set(kind, new FactorySite(host, { looks, director, audio, particles, settings }, world));
+    const yardOf = new Map<ProductKind, ConstructionSite>();
+    for (const p of PLOTS) if (!p.built) { const c = new ConstructionSite(looks, p); world.add(c.group); yardOf.set(p.kind, c); }
+    const yards = [...yardOf.values()];
+    const boundsOf = (kind: ProductKind): { min: Vec3; max: Vec3 } => {
+      const site = sites.get(kind);
+      if (site) return site.bounds(); // the whole building, so the back wall and sign are in frame
+      return yardOf.get(kind)?.bounds() ?? { min: [plotOf(kind).x0, SITE_Y0, 0], max: [plotOf(kind).x1, SITE_Y0 + SITE_SIZE[1], 200] }; // the crane sets the height
     };
+    const active = () => hosts.get(settings().product) ?? null;
+    const overview = () => boundsOf(settings().product);
     const rig = new CameraRig({
       overview,
       newest: () => active()?.newest() ?? null,
@@ -79,6 +90,7 @@ export default function Scene() {
       looks.set(lookOpts(s));
       looks.apply(r.scene);
       for (const h of hosts.values()) h.restyle();
+      for (const s of sites.values()) s.restyle();
       pview.refresh();
       stage.setLook(looks);
       rig.setLook(s.look);
@@ -105,10 +117,9 @@ export default function Scene() {
         director.update(simDt);
         looks.scrollBelts(simDt * CONVEYOR_SPEED);
         const cur = settings().product;
-        for (const [kind, host] of hosts) {
-          host.root.visible = kind === cur;
-          if (kind === cur) host.update(simDt, realDt);
-        }
+        hosts.get(cur)?.update(simDt, realDt);
+        sites.get(cur)?.update(realDt, 0); // night wired in Task 18
+        for (const y of yards) y.update(realDt);
         rig.update(realDt, t);
         const c = rig.center();
         audio.setListener(c.x, c.halfWidth);
@@ -150,8 +161,11 @@ export default function Scene() {
     const unsub = settingsStore.subscribe((s, p) => {
       if (s.quality !== p.quality) { r.setQuality(s.quality); resize(); }
       if (s.look !== p.look || s.theme !== p.theme || s.colorMode !== p.colorMode || s.quality !== p.quality) applyLook();
-      if (effLayout(s) !== effLayout(p)) { for (const h of hosts.values()) h.relayout(effLayout(s)); fitStage(); }
-      if (s.product !== p.product) fitStage();
+      if (effLayout(s) !== effLayout(p)) {
+        for (const [kind, h] of hosts) { h.relayout(effLayout(s)); sites.get(kind)?.rebuild(); }
+        fitStage();
+      }
+      if (s.product !== p.product) { rig.fly(boundsOf(p.product), performance.now()); fitStage(); audio.play('whoosh'); }
       if (s.camera !== p.camera || s.pace !== p.pace) rig.mode = modeOf(s);
       if (s.volume !== p.volume) audio.setVolume(s.volume);
       if (s.sound !== p.sound) audio.setEnabled(s.sound);
@@ -167,6 +181,9 @@ export default function Scene() {
       document.removeEventListener('visibilitychange', onVisible);
       offLoop();
       loop.dispose();
+      for (const s of sites.values()) s.dispose();
+      for (const y of yards) y.dispose();
+      ground.dispose();
       for (const h of hosts.values()) h.destroy();
       rig.dispose();
       pview.dispose();

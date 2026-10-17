@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { FLIGHT_MS, flightPose, type Pose } from './campus';
 import { PARTICLE_LAYER } from './particlesView';
 import type { Look, Vec3 } from './types';
 
@@ -74,6 +75,10 @@ export class CameraRig {
   private userUntil = -Infinity;
   private cineAt = -Infinity;
   private cineTarget: Vec3 | null = null;
+  private flight: { from: Pose; box: { min: Vec3; max: Vec3 }; t0: number } | null = null;
+  private shakeAmt = 0;
+  private shakeOff = new THREE.Vector3();
+  private aimAt = new THREE.Vector3();
 
   constructor(private targets: CameraTargets) {
     for (const c of [this.persp, this.ortho]) {
@@ -109,7 +114,7 @@ export class CameraRig {
     c.maxPolarAngle = MAX_POLAR;
     [c.minDistance, c.maxDistance] = DOLLY;
     // hand over the rig's target once; while the user holds control, OrbitControls owns it (pan sticks)
-    c.addEventListener('start', () => { this.dragging = true; c.target.copy(this.target); });
+    c.addEventListener('start', () => { this.dragging = true; this.flight = null; c.target.copy(this.target); }); // a user drag cancels the flight
     c.addEventListener('end', () => { this.dragging = false; this.userUntil = performance.now() + USER_HOLD_MS; });
     this.controls = c;
   }
@@ -123,8 +128,36 @@ export class CameraRig {
     this.apply();
   }
 
+  /** Fly from the current pose to the (already switched) overview: pull out, pan, push in. `from` = the old factory's box. */
+  fly(from: { min: Vec3; max: Vec3 }, now: number): void {
+    this.flight = { from: { target: [this.target.x, this.target.y, this.target.z], extent: this.extent }, box: from, t0: now };
+  }
+
+  get flying(): boolean { return this.flight !== null; }
+
+  /** Kick the camera (shotgun recoil); decays in ~0.3 s. */
+  shake(mag: number): void { this.shakeAmt = Math.max(this.shakeAmt, mag); }
+
   /** Returns true (the camera always participates in the frame). */
   update(realDt: number, now: number): boolean {
+    this.shakeAmt *= Math.exp(-realDt * 12);
+    if (this.shakeAmt < 1e-3) this.shakeAmt = 0;
+    if (this.flight) {
+      const f = this.flight;
+      const g = this.goal(now);
+      const ov = this.targets.overview();
+      const min: Vec3 = [Math.min(f.box.min[0], ov.min[0]), Math.min(f.box.min[1], ov.min[1]), Math.min(f.box.min[2], ov.min[2])];
+      const max: Vec3 = [Math.max(f.box.max[0], ov.max[0]), Math.max(f.box.max[1], ov.max[1]), Math.max(f.box.max[2], ov.max[2])];
+      const wide = Math.max(1.25 * Math.max(f.from.extent, g.extent), fitView(min, max, g.dir, this.aspect, this.isOrtho()).extent);
+      const u = (now - f.t0) / FLIGHT_MS;
+      const p = flightPose(u, f.from, { target: g.target, extent: g.extent }, wide);
+      this.target.set(...p.target);
+      this.extent = p.extent;
+      this.dir.set(...g.dir);
+      if (u >= 1) this.flight = null;
+      this.apply();
+      return true;
+    }
     if (this.controls && (this.dragging || now < this.userUntil)) {
       this.controls.update();
       this.readBack();
@@ -192,17 +225,25 @@ export class CameraRig {
   }
 
   private apply(): void {
-    if (this.isOrtho()) {
+    const ortho = this.isOrtho();
+    const cam = this.active();
+    // shake: the same random kick on the position and the look-at point (a pure translation); exactly zero when settled
+    this.aimAt.copy(this.target);
+    cam.position.copy(this.target).addScaledVector(this.dir, ortho ? 5000 : this.extent);
+    if (this.shakeAmt > 0) {
+      const k = this.shakeAmt * 0.015 * (ortho ? this.extent : this.extent * TAN);
+      this.shakeOff.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(2 * k);
+      cam.position.add(this.shakeOff);
+      this.aimAt.add(this.shakeOff);
+    }
+    if (ortho) {
       const h = this.extent;
       Object.assign(this.ortho, { left: -h * this.aspect, right: h * this.aspect, top: h, bottom: -h });
-      this.ortho.position.copy(this.target).addScaledVector(this.dir, 5000);
-      this.ortho.lookAt(this.target);
-      this.ortho.updateProjectionMatrix();
     } else {
       this.persp.aspect = this.aspect;
-      this.persp.position.copy(this.target).addScaledVector(this.dir, this.extent);
-      this.persp.lookAt(this.target);
-      this.persp.updateProjectionMatrix();
+      this.persp.near = Math.max(1, this.extent / 40); // keeps depth resolution fine enough for 0.5-unit road markings from far out
     }
+    cam.lookAt(this.aimAt);
+    cam.updateProjectionMatrix();
   }
 }

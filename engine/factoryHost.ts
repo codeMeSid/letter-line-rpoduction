@@ -4,6 +4,7 @@ import { buildConveyor, type Conveyor } from '../factories/shared/conveyor';
 import { BELT_TOP } from '../factories/shared/dims';
 import { hazardBand, housing } from '../factories/shared/parts';
 import { ShelfView } from '../shelf/view';
+import { PAD_RIGHT } from './campus';
 import type { Director } from './director';
 import type { FactoryDef } from './factory';
 import { GAP, layoutStations, type LayoutResult } from './layout';
@@ -27,6 +28,8 @@ export interface HostDeps {
 
 export const FLOOR_PAD = 70;
 
+export interface Box2 { x0: number; x1: number; y0: number; y1: number }
+
 /**
  * Mounts one FactoryDef in 3D at its world origin: floor, conveyors, stations, the Line, product
  * handles for in-flight jobs (shelved ones belong to the ShelfView). Layout anchors sit at belt-top height.
@@ -43,6 +46,7 @@ export class FactoryHost {
   private handles = new Map<number, ProductHandle>();
   private shaped = new Map<number, string>();
   private offs: (() => void)[] = [];
+  private box: Box2 = { x0: 0, x1: 0, y0: 0, y1: 0 };
 
   constructor(readonly def: FactoryDef, readonly origin: Vec3, private d: HostDeps, mode: LayoutMode) {
     d.parent.add(this.root);
@@ -91,6 +95,9 @@ export class FactoryHost {
       max: [Math.max(a.max[0], b.max[0]), Math.max(a.max[1], b.max[1]), Math.max(a.max[2], b.max[2])],
     };
   }
+
+  /** The floor slab footprint: layout + shelf padded by FLOOR_PAD, and by the dock pad on +x. */
+  floorBox(): Box2 { return { ...this.box }; }
 
   /** Newest job on the line; a job arcing to the shelf only when nothing else is on the line (follow camera). */
   newest(): Vec3 | null {
@@ -197,9 +204,10 @@ export class FactoryHost {
     const b = this.layout.bounds;
     const s = this.shelfView.bounds();
     const x0 = Math.min(b.min[0], s.min[0]) - FLOOR_PAD;
-    const x1 = Math.max(b.max[0], s.max[0]) + FLOOR_PAD;
+    const x1 = Math.max(b.max[0], s.max[0]) + PAD_RIGHT; // +x is the dock side
     const y0 = Math.min(b.min[1], s.min[1]) - FLOOR_PAD;
     const y1 = Math.max(b.max[1], s.max[1]) + FLOOR_PAD;
+    this.box = { x0, x1, y0, y1 };
     const floor = housing(looks, x1 - x0, y1 - y0, 4, 'concrete', 2);
     floor.position.set((x0 + x1) / 2, (y0 + y1) / 2, -4);
     floor.castShadow = false;

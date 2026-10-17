@@ -1,10 +1,16 @@
 'use client';
 
 import { settingsStore, useSettings } from '../engine/settings';
-import { LOOKS, PACES, type Look, type Pace, type Quality } from '../engine/types';
+import { LOOKS, PACES, PRODUCT_KINDS, type Look, type Pace, type ProductKind, type Quality } from '../engine/types';
+import { FACTORIES } from '../factories/registry';
 
 const LOOK_LABEL: Record<Look, string> = { realistic: 'Realistic', lineart: 'Line art', flat: 'Flat iso', cutaway: 'Cutaway' };
 const PACE_LABEL: Record<Pace, string> = { auto: 'Auto (typing speed)', fast: 'Fast', detailed: 'Detailed', cinematic: 'Cinematic (one at a time)' };
+const PRODUCT_LABEL: Record<ProductKind, string> = {
+  letter: 'Cast metal letter', bottle: 'Glass bottle', cookie: 'Cookie', donut: 'Donut', mug: 'Pottery mug', can: 'Can', car: 'Toy car',
+};
+/** Dev builds can fly to construction sites to check the campus flight; production lists them as coming soon. */
+const DEV = process.env.NODE_ENV !== 'production';
 const CAMERAS = ['overview', 'follow', 'cinematic'] as const;
 
 /** Minimal settings panel (Escape toggles). Full HUD lands in a later plan. */
@@ -20,6 +26,13 @@ export default function Hud() {
         <span>Factory</span>
         <button type="button" onClick={(e) => { e.currentTarget.blur(); set({ hudOpen: false }); }} aria-label="Close settings">×</button>
       </header>
+      <label>Product
+        <select value={s.product} onChange={(e) => { e.target.blur(); set({ product: e.target.value as ProductKind }); }}>
+          {PRODUCT_KINDS.map((k) => (
+            <option key={k} value={k} disabled={!FACTORIES[k] && !DEV}>{PRODUCT_LABEL[k]}{FACTORIES[k] ? '' : ' (coming soon)'}</option>
+          ))}
+        </select>
+      </label>
       <label>Look
         <select value={s.look} onChange={(e) => { e.target.blur(); set({ look: e.target.value as Look }); }}>
           {LOOKS.map((l) => <option key={l} value={l}>{LOOK_LABEL[l]}</option>)}
