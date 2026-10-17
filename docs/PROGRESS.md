@@ -21,7 +21,20 @@ its Tasks 5–13 are superseded. Controller-owned file (implementers do not edit
 | 10 | Cast metal letter product | complete (2 fix rounds) | 36b5584..e6b5c8e |
 | 11 | Letter stations 1–4 | complete (1 fix round) | e6b5c8e..781b9ac |
 | 12 | Letter stations 5–7, registry, end-to-end | complete (2 fix rounds) | 781b9ac..1833d11 |
-| Final | Whole-branch review | pending | |
+| Final | Whole-branch review (Tasks 5–12) | done in final fix wave | |
+| 13 | Campus pure groundwork (kinds, campus, backspace plan, sky, patrol, director) | complete | ef2511d..d2d418e |
+| 14 | Campus scene: buildings, construction sites, flight, picker | complete (1 fix round) | d2d418e..e2b2ad0 |
+| 15 | Shotgun, fragments, destroyer | complete (1 fix round) | e2b2ad0..6a458fb |
+| 16 | Reject hoist, debris broom, gap, HUD options | complete (1 fix round) | 6a458fb..37f20ed |
+| 17 | Forklift row shipping, per-row planks, figure | complete (1 fix round) | 37f20ed..700a9bd |
+| 18 | Workers, day/night, HUD toggles, docs | complete | 700a9bd..66e929d |
+| Final | Whole-branch review (Tasks 13–18) | complete (1 fix pass) | 66e929d..3b98fe2 |
+
+Campus plan (Tasks 13–18): `docs/superpowers/plans/2026-10-17-campus-foundation.md`, spec
+`docs/superpowers/specs/2026-10-17-campus-foundation-design.md`, ledger `.superpowers/sdd/2026-10-17-campus-foundation/progress.md`.
+Key rulings: overview frames machines+shelf (not the building); no camera shake during user orbit hold; placing-arc shots
+fall to the floor; forklift never turns (reverse out the dock, carriage raised over rows, lowered for the 110 lintel,
+telescoping mast); shelf ROW_PITCH 32, overflow rows > 4 stack upward in tiers clear of the robot rail. Next: bottle factory spec.
 
 ## Rulings (decisions made on the user's behalf)
 
