@@ -4,6 +4,7 @@ import { Looks } from '../engine/looks';
 import type { ProductHandle } from '../engine/product';
 import type { Vec3 } from '../engine/types';
 import { Forklift } from './forklift';
+import { LINTEL } from '../factories/shared/building';
 import { fakeAudio, meshes } from './testkit';
 
 const PARK: Vec3 = [1200, -500, 0];
@@ -292,11 +293,45 @@ describe('Forklift', () => {
     const group = new THREE.Group();
     group.add(plank);
     let liftZ = -1;
-    fk.fetch(() => top, () => { liftZ = fk.group.getObjectByName('carriage')!.getWorldPosition(new THREE.Vector3()).z; return { group, handles: [] }; }, 50);
+    fk.fetch(() => top, () => { liftZ = fk.group.getObjectByName('carriage')!.getWorldPosition(new THREE.Vector3()).z; return { group, handles: [] }; }, 50, 900);
     for (let i = 0; i < 60 * 8 && liftZ < 0; i++) fk.update(1 / 60, 1);
     expect(liftZ).toBeCloseTo(98 - 6, 1); // forks go in 6 under the tier's plank top, not at the base level
     const z0 = worldZ(plank);
     for (let i = 0; i < 60 * 3; i++) fk.update(1 / 60, 1);
     expect(worldZ(plank) - z0).toBeCloseTo(14, 0); // the others are far below: only the lift, not the full clearance
+  });
+  it('a 6-row (tier 5) fetch lowers the load under the lintel before the door line, and the mast always covers the carriage', () => {
+    const looks = new Looks({ look: 'realistic', theme: 'dark', colorMode: 'accent', quality: 'high' });
+    const fk = new Forklift(looks, fakeAudio().audio, PARK, DOOR);
+    const top: Vec3 = [900, -440, 98];
+    const group = new THREE.Group();
+    const plank = looks.part(new THREE.BoxGeometry(500, 22, 4), 'wood');
+    plank.position.set(650, -440, 96);
+    const prod = new THREE.Group();
+    prod.add(new THREE.Mesh(new THREE.BoxGeometry(26, 8, 32)));
+    prod.position.set(800, -455, 98);
+    group.add(plank, prod);
+    const handle: ProductHandle = { root: prod, shape() {}, place() {}, restyle() {}, dispose() {} };
+    fk.fetch(() => top, () => ({ group, handles: [handle] }), 80, 900);
+    const carriage = fk.group.getObjectByName('carriage')!;
+    const inner = fk.group.getObjectByName('mast-inner')!;
+    const bx = new THREE.Box3();
+    let crossed = 0;
+    let sawTelescope = false;
+    for (let i = 0; i < 60 * 20 && fk.busy; i++) {
+      fk.update(1 / 60, 1);
+      const cTop = worldZ(carriage) + 36.2;
+      inner.updateWorldMatrix(true, false);
+      const innerTop = inner.visible ? new THREE.Box3().setFromObject(inner).max.z : 0;
+      sawTelescope ||= inner.visible;
+      expect(Math.max(70, innerTop)).toBeGreaterThanOrEqual(cTop - 1e-6);
+      if (group.parent && !(handle as { disposed?: boolean }).disposed) {
+        prod.updateWorldMatrix(true, true);
+        bx.setFromObject(prod);
+        if (bx.min.x <= DOOR[0] && bx.max.x >= DOOR[0]) { crossed++; expect(bx.max.z).toBeLessThan(LINTEL); }
+      }
+    }
+    expect(sawTelescope).toBe(true);
+    expect(crossed).toBeGreaterThan(5);
   });
 });

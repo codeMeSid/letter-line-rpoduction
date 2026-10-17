@@ -19,7 +19,7 @@ function setup(over = {}, withSite = true) {
   });
   f.director.setBackspaceHandler(d);
   f.parent.add(d.group);
-  const step = (s: number) => { for (let t = 0; t < s; t += 1 / 30) { f.director.update(1 / 30); f.host.update(1 / 30, 1 / 30); site.update(1 / 30, 0); d.update(1 / 30); } };
+  const step = (s: number) => { for (let t = 0; t < s; t += 1 / 30) { f.director.update(1 / 30); f.host.update(1 / 30, 1 / 30); site.update(1 / 30); d.update(1 / 30); } };
   const shelve = () => { for (let i = 0; i < 600 && f.director.jobsOf('letter').length; i++) step(1 / 30); };
   const bs = () => f.director.handle({ type: 'backspace' });
   return { ...f, d, site, step, shelve, bs, flashes };

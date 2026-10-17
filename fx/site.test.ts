@@ -8,7 +8,7 @@ import { meshes, miniFactory } from './testkit';
 function setup(over = {}) {
   const f = miniFactory(over);
   const site = new FactorySite(f.host, { looks: f.looks, director: f.director, audio: f.audio, particles: f.particles, settings: () => f.settings }, f.parent);
-  const step = (s: number) => { for (let t = 0; t < s - 1e-9; t += 1 / 30) { f.director.update(1 / 30); f.host.update(1 / 30, 1 / 30); site.update(1 / 30, 0); } };
+  const step = (s: number) => { for (let t = 0; t < s - 1e-9; t += 1 / 30) { f.director.update(1 / 30); f.host.update(1 / 30, 1 / 30); site.update(1 / 30); } };
   const shelve = () => { for (let i = 0; i < 1800 && f.director.jobsOf('letter').length; i++) step(1 / 30); };
   const shipped: string[] = [];
   f.director.events.on('row:shipped', ({ slots }) => shipped.push(slots.map((x) => x.char).join('')));
@@ -48,7 +48,7 @@ describe('FactorySite', () => {
     expect(hoist.group.parent).toBe(site.group);
     expect(broom.group.parent).toBe(site.group);
     expect(Math.abs(home().x - site.building.chuteTop[0])).toBeLessThan(12);
-    site.update(0.1, 0);
+    site.update(0.1);
     site.dispose();
     expect(hoist.group.parent).toBeNull();
     expect(broom.group.parent).toBeNull();
@@ -59,7 +59,7 @@ describe('FactorySite', () => {
     expect(site.hoist.busy).toBe(false);
     site.broom.sweep(() => [0, 0, 18], 'gap', () => {});
     expect(site.broom.busy).toBe(true);
-    for (let i = 0; i < 1800; i++) site.update(1 / 60, 0); // 30 s: the shelf is ~500 wide, so the trip is long
+    for (let i = 0; i < 1800; i++) site.update(1 / 60); // 30 s: the shelf is ~500 wide, so the trip is long
     expect(site.broom.busy).toBe(false);
   });
   it('owns one forklift for its whole life, parked facing -x at the dock; a rebuild keeps it and moves its park', () => {

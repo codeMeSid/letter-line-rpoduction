@@ -129,9 +129,10 @@ export default function Scene() {
         hosts.get(cur)?.update(simDt, realDt);
         const sky = skyAtTime((t - t0) / 1000, settings().dayNight);
         stage.setSky(sky, looks);
-        if (lastNight > 0.5 && sky.night <= 0.5) audio.play('factory-bell'); // dawn
+        if (settings().dayNight && lastNight > 0.5 && sky.night <= 0.5) audio.play('factory-bell'); // dawn
         lastNight = sky.night;
-        sites.get(cur)?.update(realDt, sky.night);
+        for (const site of sites.values()) site.building.setNight(sky.night > 0.5); // no-op when unchanged
+        sites.get(cur)?.update(realDt);
         for (const y of yards) { y.update(realDt); y.setNight(sky.night > 0.5); }
         destroyer.update(realDt);
         stage.tick(realDt);

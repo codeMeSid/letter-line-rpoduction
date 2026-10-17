@@ -50,8 +50,7 @@ export class FactorySite {
     this.workers.setLoop(this.loop());
   }
 
-  update(realDt: number, night: number): void {
-    this.building.setNight(night > 0.5); // setNight is a no-op when unchanged
+  update(realDt: number): void {
     this.hoist.update(realDt);
     this.broom.update(realDt);
     this.workers.group.visible = this.d.settings().workers;
@@ -70,6 +69,7 @@ export class FactorySite {
           return load;
         },
         view.span().z + view.productHeight, // the other rows' product tops
+        view.bounds().max[0], // shelf +x end
       );
     }
     this.forklift.update(realDt, 1 + Math.max(0, shelf.rows.length - SHELF_ROWS - 1)); // rows waiting: it hurries

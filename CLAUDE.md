@@ -8,7 +8,7 @@ A full-page Next.js app: every typed character runs an animated 3D factory (Thre
 realistic, line-art, flat iso, cutaway) whose real procedural machines visibly turn raw material into
 a product that is or bears that character, then shelve it like a typewriter. Space = empty slot, Backspace = remove the
 last slot (landed: shotgun for shelved products, reject hoist and chute, shelf broom), Enter = new row (landed: the dock forklift ships the
-oldest row once more than three are shelved). Product factories (all landed): cast metal letter, glass bottle, cookie, donut, mug, can, toy car.
+oldest row once more than three are shelved). Product factories: cast metal letter landed; glass bottle, cookie, donut, mug, can, toy car are construction-site plots (later plans).
 They stand on a campus (picker to fly between factories, construction sites for later ones); each built factory sits in a building with workers
 patrolling it and an optional day/night cycle. Procedural sound (default off), collapsible HUD.
 **User bar:** real machinery, the product visibly taking shape — never placeholder boxes.

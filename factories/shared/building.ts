@@ -21,6 +21,8 @@ export interface Building {
   dispose(): void;
 }
 
+/** Underside of the dock door's lintel beam. */
+export const LINTEL = 110;
 const T = 8;       // wall thickness
 const KNEE = 24;   // front knee wall / side walls' front height
 const PLINTH = 40; // back wall concrete base
@@ -168,7 +170,7 @@ export function buildBuilding(looks: Looks, floor: Box2, height: number): Buildi
   // ponytail: lintel at 110 clears a carried letter (~90 tall); taller future products need a taller door or crates.
   place(column(looks, 3, 112, 'steel', 14), doorX, y0 + DOCK_A + 3, 0);
   place(column(looks, 3, 112, 'steel', 14), doorX, y0 + DOCK_B - 3, 0);
-  group.add(beam(looks, [doorX, y0 + DOCK_A, 110], [doorX, y0 + DOCK_B, 110], 4));
+  group.add(beam(looks, [doorX, y0 + DOCK_A, LINTEL], [doorX, y0 + DOCK_B, LINTEL], 4));
   place(housing(looks, 8, DOCK_B - DOCK_A + 6, 14, 'paint-accent', 1.5), doorX, doorY, 112); // roll-up shutter box
   place(hazardBand(looks, 14, DOCK_B - DOCK_A, 0.6), x1 - 4, doorY, 0); // threshold
   place(box(looks, 70, 120, 2, 'concrete'), x1 + 35, doorY, -2); // apron

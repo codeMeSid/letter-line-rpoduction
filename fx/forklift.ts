@@ -3,7 +3,7 @@ import type { AudioBus } from '../audio/bus';
 import type { Looks } from '../engine/looks';
 import type { ProductHandle } from '../engine/product';
 import type { Vec3 } from '../engine/types';
-import { cube } from '../factories/shared/building';
+import { cube, LINTEL } from '../factories/shared/building';
 import { figure } from '../factories/shared/figure';
 import { beam, box, column, disposeTree, hazardBand, housing, lamp, merged } from '../factories/shared/parts';
 
@@ -26,6 +26,10 @@ const MARGIN = 10;        // extra reverse past the shelf end before the diagona
 const DOOR_LEAD = 150;    // the diagonal ends this far inside the door, lined up with it
 const APPROACH_Z = 6;     // carriage height below the plank top when sliding in (fork 1.5 thick, plank 4 thick: the forks just fit under it)
 const REST_Z = 0.3;
+const MAST_H = 70;        // outer mast height
+const CARRIAGE_H = 36.2;  // backrest top above the carriage origin
+const MAST_MARGIN = 6;    // the inner mast stands this far above the carriage top
+const DOOR_EASE = 40;     // min x run for the lowering ramp before the door
 const BEYOND = 220;
 const CARRIAGE_RATE = 6;  // 1 / s
 const BEEP_T = 0.5;       // real seconds between reversing beeps
@@ -68,6 +72,7 @@ export class Forklift {
   readonly group = new THREE.Group();
   readonly truck = new THREE.Group();
   private carriage = named(new THREE.Group(), 'carriage');
+  private inner = named(new THREE.Group(), 'mast-inner');
   private forks = named(new THREE.Group(), 'forks');
   private steer = new THREE.Group();
   private wheels: { spin: THREE.Group; r: number }[] = [];
@@ -88,6 +93,13 @@ export class Forklift {
   private endX = 0;          // the fetched plank's +x end
   private travel = LIFT;     // total carriage rise while carrying: clears the products on the other rows
   private clearTop = 0;
+  private shelfX1 = 0;
+  private plankLen = 0;
+  private productH = 0;
+  private lowerFrom = 0;     // out leg: carriage height when it left the shelf
+  private lowerTo = Infinity; // out leg: carriage height that clears the door lintel
+  private lowerXs = 0;       // truck x where the lowering ramp starts / ends
+  private lowerXe = 0;
   private rdt = 0;           // this frame's real dt (beep and blink run in real time)
   private beepT = 0;
   private blinkT = 0;
@@ -138,6 +150,10 @@ export class Forklift {
       t.add(beam(looks, [12.5, sy * 13.5, 15], [5, sy * 13.5, 36], 2.2));
     }
     for (const z of [6, 64]) t.add(at(box(looks, 4, 26, 3, 'steel'), 5, 0, z));
+    // telescoping inner mast: unit-height uprights scaled in z so the mast always reaches above the carriage
+    for (const sy of [-1, 1]) this.inner.add(at(box(looks, 2.4, 2.4, 1, 'steel'), 5, sy * 5.4, 0));
+    this.inner.position.z = 6;
+    t.add(this.inner);
     t.add(at(column(looks, 1.5, 40, 'steel', 10), 5, 0, 9)); // lift cylinder, inside the mast between the uprights
 
     // ---- carriage: plate behind the forks, load backrest, two forks ----
@@ -197,11 +213,13 @@ export class Forklift {
    * Fetch one plank. `target()` is the plank's +x end at its top (read every frame until the lift, because planks glide);
    * null = gone, so go home. At lift time `onLift()` hands over the plank and its products; null = abort. Ignored while busy.
    * `clearTop` = world z of the highest product top on the other rows: the carried plank's underside passes CLEAR above it.
+   * `shelfX1` = the shelf's +x end: on the way out the load is lowered for the door lintel once its tail has passed it.
    * The forklift never turns: the forks (-x) face the shelf the whole trip and it reverses out.
    */
-  fetch(target: () => Vec3 | null, onLift: () => Load | null, clearTop = 0): void {
+  fetch(target: () => Vec3 | null, onLift: () => Load | null, clearTop = 0, shelfX1 = 0): void {
     if (this.state !== 'idle') return;
     this.clearTop = clearTop;
+    this.shelfX1 = shelfX1;
     this.target = target;
     this.onLift = onLift;
     this.state = 'go';
@@ -219,6 +237,10 @@ export class Forklift {
     this.blinkT += dt;
     let left = dt * speed;
     for (let guard = 0; guard < 8 && left >= 0 && this.busy; guard++) left = this.step(left);
+    if (this.load && this.state === 'out' && this.lowerTo < this.lowerFrom) {
+      const k = smooth((this.x - this.lowerXs) / (this.lowerXe - this.lowerXs));
+      this.cz = this.czTo = Math.min(this.cz, this.lowerFrom + (this.lowerTo - this.lowerFrom) * k);
+    }
     if (!this.load || this.state === 'return' || this.state === 'park') {
       this.cz += (this.czTo - this.cz) * (1 - Math.exp(-CARRIAGE_RATE * dt * speed));
     }
@@ -263,6 +285,9 @@ export class Forklift {
         if (!load) return this.abort(left);
         this.load = load;
         this.endX = t.x;
+        const lb = new THREE.Box3().setFromObject(load.group);
+        this.plankLen = lb.max.x - lb.min.x;
+        this.productH = Math.max(0, lb.max.z - t.z);
         this.travel = Math.max(LIFT, this.clearTop + CLEAR - (t.z - PLANK_T)); // plank underside = t.z - PLANK_T at the lift
         // the detached load's local matrix is its world matrix (shelf view group, host root and site group are identity)
         this.forks.attach(load.group); // world transform kept: the plank now rides the carriage
@@ -295,6 +320,11 @@ export class Forklift {
         this.beep();
         if (left < 0) return -1;
         this.state = this.load ? 'out' : 'return'; // no load: this was an abort backing out of the row
+        // plank top that puts the product tops CLEAR under the lintel -> carriage height; never raise
+        this.lowerFrom = this.cz;
+        this.lowerTo = LINTEL - CLEAR - this.productH - APPROACH_Z;
+        this.lowerXe = this.door[0] + TUCK - 10; // the load's +x end is 10 short of the door line
+        this.lowerXs = Math.min(this.shelfX1 + TUCK + this.plankLen, this.lowerXe - DOOR_EASE); // tail clear of the shelf
         this.st = 0; // out: leg 0 = diagonal to the door's y, 1 = straight out through it
         this.motor();
         return left;
@@ -403,6 +433,9 @@ export class Forklift {
     this.truck.position.set(this.x, this.y, this.z);
     this.truck.rotation.z = this.yaw;
     this.carriage.position.z = this.cz;
+    const mastTop = Math.max(MAST_H, this.cz + CARRIAGE_H + MAST_MARGIN);
+    this.inner.visible = mastTop > MAST_H;
+    this.inner.scale.z = mastTop - 6;
     for (const w of this.wheels) w.spin.rotation.y = -this.roll / w.r;
     if (dt > 0) {
       const rate = wrap(this.yaw - this.lastYaw) / dt;
