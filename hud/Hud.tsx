@@ -73,6 +73,14 @@ export default function Hud() {
         </select>
       </label>
       <label className="hud-row">
+        <input type="checkbox" checked={s.dayNight} onChange={(e) => { e.target.blur(); set({ dayNight: e.target.checked }); }} />
+        Day / night
+      </label>
+      <label className="hud-row">
+        <input type="checkbox" checked={s.workers} onChange={(e) => { e.target.blur(); set({ workers: e.target.checked }); }} />
+        Workers
+      </label>
+      <label className="hud-row">
         <input type="checkbox" checked={s.sound} onChange={(e) => { e.target.blur(); set({ sound: e.target.checked }); }} />
         Sound
       </label>

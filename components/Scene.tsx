@@ -8,6 +8,7 @@ import { Director } from '@/engine/director';
 import { FactoryHost } from '@/engine/factoryHost';
 import { keyRoute, keyToCommand } from '@/engine/input';
 import { CONVEYOR_SPEED } from '@/engine/line';
+import { skyAtTime } from '@/engine/dayNight';
 import { createLoop } from '@/engine/loop';
 import { Looks, type LookOptions } from '@/engine/looks';
 import { paceParams } from '@/engine/pace';
@@ -89,6 +90,8 @@ export default function Scene() {
       const a = active();
       if (a) looks.cutPlane.constant = -a.layout.anchors[0][1];
     };
+    let lastNight = 0;
+    const t0 = performance.now();
     const applyLook = () => {
       const s = settings();
       looks.set(lookOpts(s));
@@ -98,6 +101,7 @@ export default function Scene() {
       destroyer.restyle();
       pview.refresh();
       stage.setLook(looks);
+      stage.setSky(skyAtTime((performance.now() - t0) / 1000, s.dayNight), looks);
       rig.setLook(s.look);
       post.configure(s.look, s.quality, looks.edgeColor());
     };
@@ -123,8 +127,12 @@ export default function Scene() {
         looks.scrollBelts(simDt * CONVEYOR_SPEED);
         const cur = settings().product;
         hosts.get(cur)?.update(simDt, realDt);
-        sites.get(cur)?.update(realDt, 0); // night wired in Task 18
-        for (const y of yards) y.update(realDt);
+        const sky = skyAtTime((t - t0) / 1000, settings().dayNight);
+        stage.setSky(sky, looks);
+        if (lastNight > 0.5 && sky.night <= 0.5) audio.play('factory-bell'); // dawn
+        lastNight = sky.night;
+        sites.get(cur)?.update(realDt, sky.night);
+        for (const y of yards) { y.update(realDt); y.setNight(sky.night > 0.5); }
         destroyer.update(realDt);
         stage.tick(realDt);
         rig.update(realDt, t);

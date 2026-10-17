@@ -12,13 +12,15 @@ import { SHELF_ROWS } from '../shelf/model';
 import { Broom } from './broom';
 import { Forklift } from './forklift';
 import { Hoist, type HoistAnchors } from './hoist';
+import { patrolLoop } from '../engine/patrol';
+import { Workers } from './workers';
 
 export interface SiteDeps { looks: Looks; director: Director; audio: AudioBus; particles: ParticleSystem; settings: () => Settings }
 
 export const BUILDING_MIN_H = 320;
 const SIGN_SCALE = 3;
 
-/** Everything around one built factory's machines: building shell, sign, reject hoist, shelf broom, dock forklift; later workers. */
+/** Everything around one built factory's machines: building shell, sign, reject hoist, shelf broom, dock forklift, patrolling workers. */
 export class FactorySite {
   readonly group = new THREE.Group();
   building!: Building;
@@ -26,6 +28,7 @@ export class FactorySite {
   readonly hoist: Hoist;
   readonly broom: Broom;
   readonly forklift: Forklift;
+  readonly workers: Workers;
   private sign: ProductHandle | null = null;
 
   constructor(readonly host: FactoryHost, private d: SiteDeps, parent: THREE.Object3D) {
@@ -34,7 +37,8 @@ export class FactorySite {
     this.hoist = new Hoist(d.looks, d.audio, this.anchors());
     this.broom = new Broom(d.looks, d.audio, d.particles, () => { const s = host.shelfView.span(); return [s.x1 + 20, s.y, s.z]; });
     this.forklift = new Forklift(d.looks, d.audio, this.building.dockPark, this.building.dockDoor);
-    this.group.add(this.hoist.group, this.broom.group, this.forklift.group);
+    this.workers = new Workers(d.looks, this.loop());
+    this.group.add(this.hoist.group, this.broom.group, this.forklift.group, this.workers.group);
   }
 
   /** After host.relayout(): the floor box changed. */
@@ -43,12 +47,15 @@ export class FactorySite {
     this.build();
     this.hoist.setAnchors(this.anchors());
     this.forklift.setDock(this.building.dockPark, this.building.dockDoor);
+    this.workers.setLoop(this.loop());
   }
 
   update(realDt: number, night: number): void {
     this.building.setNight(night > 0.5); // setNight is a no-op when unchanged
     this.hoist.update(realDt);
     this.broom.update(realDt);
+    this.workers.group.visible = this.d.settings().workers;
+    if (this.workers.group.visible) this.workers.update(realDt);
     const shelf = this.d.director.shelf(this.host.def.kind);
     if (!this.forklift.busy && shelf.readyToShip()) {
       const row = shelf.rows[0];
@@ -78,9 +85,12 @@ export class FactorySite {
     this.hoist.dispose();
     this.broom.dispose();
     this.forklift.dispose();
+    this.workers.dispose();
     this.clear();
     this.group.removeFromParent();
   }
+
+  private loop() { const b = this.host.layout.bounds; return patrolLoop(b.min, b.max, 45); }
 
   private anchors(): HoistAnchors {
     const { chuteTop, chuteBottom, binPos, height } = this.building;

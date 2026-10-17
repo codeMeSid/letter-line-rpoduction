@@ -122,6 +122,35 @@ describe('FactorySite', () => {
     expect(maxY).toBeGreaterThan(t.host.shelfView.span().y + 90); // it did go to the level-3 row
     expect(maxY + 19).toBeLessThan(t.host.shelfView.span().y + 150 - 14);
   });
+  it('owns patrolling workers that hide with settings.workers and follow a relayout', () => {
+    const t = setup();
+    const { workers } = t.site;
+    expect(workers.figures).toHaveLength(6);
+    expect(workers.group.parent).toBe(t.site.group);
+    t.step(1);
+    expect(workers.group.visible).toBe(true);
+    const p0 = workers.figures[0].group.position.clone();
+    t.settings.workers = false;
+    t.step(1);
+    expect(workers.group.visible).toBe(false);
+    expect(workers.figures[0].group.position.distanceTo(p0)).toBeLessThan(40); // not advanced while hidden (only the 1 s before hiding)
+    const hidden = workers.figures[0].group.position.clone();
+    t.step(1);
+    expect(workers.figures[0].group.position.distanceTo(hidden)).toBe(0);
+    t.settings.workers = true;
+    t.host.relayout('snake');
+    t.site.rebuild();
+    t.step(0.1);
+    const b = t.host.layout.bounds;
+    expect(workers.group.visible).toBe(true);
+    for (const f of workers.figures) {
+      const q = f.group.position;
+      const onFrame = Math.abs(q.x - (b.min[0] - 45)) < 0.5 || Math.abs(q.x - (b.max[0] + 45)) < 0.5 || Math.abs(q.y - (b.min[1] - 45)) < 0.5 || Math.abs(q.y - (b.max[1] + 45)) < 0.5;
+      expect(onFrame).toBe(true);
+    }
+    t.site.dispose();
+    expect(workers.group.parent).toBeNull();
+  });
   it('relayout mid-fetch: the trip still lifts the same row and ships it exactly once', () => {
     const t = setup();
     t.type('ab\ncd\nef\ngh');

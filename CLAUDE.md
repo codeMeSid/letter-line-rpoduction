@@ -7,16 +7,18 @@ Read this first in every new session.
 A full-page Next.js app: every typed character runs an animated 3D factory (Three.js, four looks:
 realistic, line-art, flat iso, cutaway) whose real procedural machines visibly turn raw material into
 a product that is or bears that character, then shelve it like a typewriter. Space = empty slot, Backspace = remove the
-last slot (shotgun / reject chute visuals are a later plan), Enter = new row (forklift row shipping later).
-Product factories: cast metal letter (landed, Tasks 5–12), then glass bottle, can, mug, cookie, neon, toy brick.
-Procedural sound (default off), collapsible HUD.
+last slot (landed: shotgun for shelved products, reject hoist and chute, shelf broom), Enter = new row (landed: the dock forklift ships the
+oldest row once more than three are shelved). Product factories (all landed): cast metal letter, glass bottle, cookie, donut, mug, can, toy car.
+They stand on a campus (picker to fly between factories, construction sites for later ones); each built factory sits in a building with workers
+patrolling it and an optional day/night cycle. Procedural sound (default off), collapsible HUD.
 **User bar:** real machinery, the product visibly taking shape — never placeholder boxes.
 
 ## Where things are
 
-- `docs/superpowers/specs/2026-10-16-3d-factory-design.md` — the 3D pivot design (binding).
-- `docs/superpowers/plans/2026-10-16-3d-core-metal-letter.md` — current executable plan: Global Constraints,
-  Tasks 5–12 (3D core + metal letter). Binding. Later milestones get their own plan files.
+- `docs/superpowers/specs/2026-10-17-campus-foundation-design.md` — campus, buildings, backspace/forklift fx, workers, day/night (binding, current).
+- `docs/superpowers/plans/2026-10-17-campus-foundation.md` — current executable plan (Global Constraints, Tasks 13–18). Binding.
+- `docs/superpowers/specs/2026-10-16-3d-factory-design.md` — the 3D pivot design (binding; campus spec builds on it).
+- `docs/superpowers/plans/2026-10-16-3d-core-metal-letter.md` — earlier plan: Global Constraints, Tasks 5–12 (3D core + metal letter). Landed.
 - `docs/plan.md` — original plan; Tasks 1–4 history, Tasks 5–13 superseded by the 3D pivot.
 - `docs/original-plan.md` — the first high-level plan + the user's Q&A choices (rendering parts superseded).
 - `docs/PROGRESS.md` — task status, rulings (decisions made on the user's behalf), deferred findings.
@@ -40,7 +42,7 @@ Procedural sound (default off), collapsible HUD.
 All three of typecheck/test/build must pass before every commit.
 Tooling: pnpm, Node 25, Next 15.5 + React 19, TypeScript 5.9 (pinned `typescript@5`; Next 15 needs the JS
 compiler API), vitest 5 (node env; `vitest.config.ts` loads as ESM via `"type": "module"`).
-`app/` and `components/` may import with `@/`; everything under `engine/ factories/ shelf/ audio/ lib/ hud/`
+`app/` and `components/` may import with `@/`; everything under `engine/ factories/ shelf/ audio/ lib/ hud/ fx/`
 uses relative imports (vitest has no alias).
 
 ## Non-negotiable conventions (full list: Global Constraints in the current plan)
@@ -51,7 +53,7 @@ uses relative imports (vitest has no alias).
   materials). No `new *Material` outside `engine/looks.ts` (shader exceptions: `edgePass.ts`, `particlesView.ts`).
 - One rAF loop (`engine/loop.ts`). No own rAF/setInterval/CSS animation for scene objects.
 - Letters only from `engine/glyphs.ts` strokes (`letterGeometry`). No fonts/TextGeometry.
-- Sound only via `audio/bus.ts`; default off. Particles only while a station processes a non-space job.
+- Sound only via `audio/bus.ts`; default off. Particles only while a station processes a non-space job, plus user-triggered fx (shot, shatter, sweep); nothing ambient (no chimney smoke, no idle dust).
 - Station local frame: z=0 = belt top (`BELT_TOP` 22), floor at z=−22. Products: built once at own origin,
   `shape(stage, t)` continuous across stages.
 - One responsibility per file; each station its own file.
@@ -99,6 +101,16 @@ uses relative imports (vitest has no alias).
   `helix`, `world`/`floorZ` for world-space particles, `teardown(group, keep)`, `oneShots()`) + `testkit.ts` (tests only). Stations build every mesh
   in `create()` with `looks.part`/parts kit (R16: never `own()`); later frames only move/show/swap geometry. `view: stations|moulder|pour|cooling|shakeout`
   runs each station on a looping fake job with a freeze-at-t slider; those views cut per object like the real Scene.
-- `fx/` — (not yet created; later plans) shotgun, chute, broom, forklift, workers, day/night
-- `hud/` — `Hud.tsx` minimal settings panel (look/pace/camera/theme/quality/sound; Escape or gear toggles; Tab moves between controls only while open; styles `.hud*` in `globals.css`). Gauges later
+- `engine/` also (campus plan): `campus` (pure plot/flight layout), `backspace` (pure backspace decision), `dayNight` (`skyAtTime`/`Sky`/`SUN_NOON`: 120 s day, 60% daylight, noon start; off = noon),
+  `patrol` (`patrolLoop`/`sampleLoop`/`loopLength`: closed rectangle walk), `stage.setSky(sky, looks)` (scales the sun/hemisphere of the look, tints/moves the sun, dims the background; `lineart` keeps its paper).
+  `Director`: a *pending* backspace waits for a busy newline row and typing cancels it; only the active product's factory advances (others freeze, resume); `shipRow(kind)` removes the oldest row once the forklift lifts it.
+  `Shelf.readyToShip()` (more than `SHELF_ROWS` = 3 rows), `shipRow()`.
+- `shelf/view.ts` also: per-row plank groups (`ROW_PITCH` 32, levels 0..3, deeper rows stack in tiers of 40 above level 3 so they never reach the robot rail), `releaseRow(row)` (forklift takes the plank + products), `release(slotId)` (shotgun takes one product), `rowEnd(row)`, `productHeight`.
+- `factories/registry.ts` — `FACTORIES`, `factoryOrigin`, `PLOTS` (campus plots; unbuilt kinds are construction sites).
+- `factories/shared/building.ts` (`buildBuilding(looks, floorBox, height)`: shell, sloped side walls, +x dock door with 110 lintel, chute/bin anchors, `setNight` windows and lamps, sign anchor) + `factories/shared/figure.ts` (`figure(looks)` low-poly worker: `pose(walk, arm, seated?)`).
+- `fx/` — `ground` (campus ground), `construction` (`ConstructionSite`, `setNight`), `site` (`FactorySite`: building + sign + hoist, broom, forklift, workers per built factory; created once, `rebuild()` after relayout, `update(realDt, night)`),
+  `fragments` + `shotgun` (backspace on a shelved product: shot + shatter), `destroyer` (the shared shotgun/fragments owner), `hoist` (reject lift + chute), `broom` (sweeps a gap/space slot),
+  `forklift` (never turns: forks face the shelf, reverses out and through the dock door; `fetch(target, onLift, clearTop)`), `workers` (6 figures walking the loop around the factory, two reversed, stopping ~every 6-12 s for 2 s to face the line with an arm raised),
+  `testkit` (tests only). fx run on real time (`realDt`), only the active factory's site updates.
+- `hud/` — `Hud.tsx` minimal settings panel (product/look/pace/camera/theme/quality, Day / night and Workers toggles, sound; Escape or gear toggles; Tab moves between controls only while open; styles `.hud*` in `globals.css`). Gauges later
 - `components/Scene.tsx` — client entry: renderer, looks, stage, post, rig, one `FactoryHost` per registered kind (`factories/registry.ts`: `FACTORIES`, `factoryOrigin`), director, the single loop, key routing (`keyRoute`; a HUD control is blurred when printable typing goes to the factory), settings subscription (`applyLook` = `looks.set` then `looks.apply(scene)` + host restyle; cutaway forces `pan` layout + clip plane)
