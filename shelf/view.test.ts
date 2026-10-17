@@ -110,6 +110,19 @@ describe('ShelfView', () => {
     expect(h2.disposed).toBe(true);
     expect(h2.root.parent).toBeNull();
   });
+  it('release hands the handle to the caller: a dying slot no longer disposes it; a second release is null', () => {
+    const shelf = new Shelf();
+    const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
+    const s = shelf.reserve('char', 'a');
+    shelf.markFilled(s.slotId);
+    const h = handle();
+    v.adopt(s.slotId, job(s.slotId), h);
+    expect(v.release(s.slotId)).toBe(h);
+    shelf.markDying(s.slotId);
+    v.update(1 / 60);
+    expect(h.disposed).toBe(false);
+    expect(v.release(s.slotId)).toBeNull();
+  });
   it('span covers the plank width at the front row', () => {
     const v = new ShelfView(new THREE.Group(), new Shelf(), [26, 8, 32], looks, [100, -400, 0]);
     const s = v.span();

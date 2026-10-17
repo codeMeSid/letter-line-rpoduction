@@ -7,8 +7,14 @@ export interface Stage {
   setLook(looks: Looks): void;
   /** Fit the sun's shadow camera around a world box. */
   fitShadow(min: Vec3, max: Vec3): void;
+  /** Muzzle flash: a brief warm point light at `pos` (decays over ~0.12 s as `tick` runs). */
+  flash(pos: Vec3): void;
+  tick(dt: number): void;
   dispose(): void;
 }
+
+const FLASH_T = 0.12;     // seconds the muzzle flash lasts
+const FLASH_PEAK = 60000; // candela at the first frame (physical point light, decay 2); tuned so the gun and nearby shelf light up
 
 const SUN_DIR = new THREE.Vector3(-0.45, -0.6, 1).normalize(); // high, from front-left
 
@@ -20,7 +26,10 @@ export function createStage(gl: THREE.WebGLRenderer, scene: THREE.Scene): Stage 
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.6;
-  scene.add(hemi, sun, sun.target);
+  // always in the scene at intensity 0, so the light count never changes and no shader recompiles
+  const muzzle = new THREE.PointLight(0xffd9a0, 0, 500, 2);
+  let flashT = 0;
+  scene.add(hemi, sun, sun.target, muzzle);
   const pmrem = new THREE.PMREMGenerator(gl);
   const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   return {
@@ -45,10 +54,18 @@ export function createStage(gl: THREE.WebGLRenderer, scene: THREE.Scene): Stage 
       cam.near = 10; cam.far = 3200;
       cam.updateProjectionMatrix();
     },
+    flash(pos) {
+      muzzle.position.set(pos[0], pos[1], pos[2]);
+      flashT = FLASH_T;
+    },
+    tick(dt) {
+      muzzle.intensity = (FLASH_PEAK * Math.max(0, flashT)) / FLASH_T;
+      flashT = Math.max(0, flashT - dt);
+    },
     dispose() {
       env.dispose();
       pmrem.dispose();
-      scene.remove(hemi, sun, sun.target);
+      scene.remove(hemi, sun, sun.target, muzzle);
     },
   };
 }

@@ -61,6 +61,13 @@ export class ShelfView {
     this.placed.set(slotId, h);
   }
 
+  /** Hand a shelved product to an fx (shotgun): no longer owned or damped here; the caller disposes it. */
+  release(slotId: number): ProductHandle | null {
+    const h = this.placed.get(slotId) ?? null;
+    this.placed.delete(slotId);
+    return h;
+  }
+
   bounds(): { min: Vec3; max: Vec3 } {
     const n = this.shown();
     const [ox, oy, oz] = this.origin;

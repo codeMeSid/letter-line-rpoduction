@@ -173,6 +173,20 @@ describe('FactoryHost', () => {
     expect(f.handles[0].root.parent).toBeNull();
     expect(f.insts[0].seen[f.insts[0].seen.length - 1]).toBeNull();
   });
+  it('release hands an on-station product to the caller: destroying the job leaves it undisposed and parented', () => {
+    const f = setup();
+    f.director.handle({ type: 'char', char: 'a' });
+    f.step(3);
+    const [job] = f.director.jobsOf('letter');
+    expect(job.phase).toBe('station');
+    const h = f.handles[0];
+    expect(f.host.release(job.id)).toBe(h);
+    expect(f.host.release(job.id)).toBeNull();
+    f.director.destroyJob(job.id);
+    f.step(3);
+    expect(h.disposed).toBe(false);
+    expect(h.root.parent).not.toBeNull();
+  });
   it('a finished product is adopted by the shelf (not disposed)', () => {
     const f = setup();
     f.director.handle({ type: 'char', char: 'a' });

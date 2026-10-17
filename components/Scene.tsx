@@ -20,6 +20,7 @@ import { createStage } from '@/engine/stage';
 import { PRODUCT_KINDS, type LayoutMode, type ProductKind, type Vec3 } from '@/engine/types';
 import { FACTORIES, factoryOrigin, PLOTS } from '@/factories/registry';
 import { ConstructionSite } from '@/fx/construction';
+import { Destroyer } from '@/fx/destroyer';
 import { buildGround } from '@/fx/ground';
 import { FactorySite } from '@/fx/site';
 import Hud from '@/hud/Hud';
@@ -75,6 +76,13 @@ export default function Scene() {
       followSpan: () => active()?.followSpan() ?? 400,
     });
 
+    const destroyer = new Destroyer({
+      director, looks, particles, audio, settings, hosts,
+      flash: (p) => stage.flash(p), shake: (m) => rig.shake(m),
+    });
+    world.add(destroyer.group);
+    director.setBackspaceHandler(destroyer);
+
     const fitStage = () => {
       const b = overview();
       stage.fitShadow(b.min, b.max);
@@ -116,6 +124,8 @@ export default function Scene() {
         hosts.get(cur)?.update(simDt, realDt);
         sites.get(cur)?.update(realDt, 0); // night wired in Task 18
         for (const y of yards) y.update(realDt);
+        destroyer.update(realDt);
+        stage.tick(realDt);
         rig.update(realDt, t);
         const c = rig.center();
         audio.setListener(c.x, c.halfWidth);
@@ -179,6 +189,8 @@ export default function Scene() {
       loop.dispose();
       for (const site of sites.values()) site.dispose();
       for (const y of yards) y.dispose();
+      director.setBackspaceHandler(null);
+      destroyer.dispose();
       ground.dispose();
       for (const h of hosts.values()) h.destroy();
       rig.dispose();

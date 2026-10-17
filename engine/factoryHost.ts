@@ -81,6 +81,14 @@ export class FactoryHost {
     for (const job of this.line.jobs) if (job.phase === 'station') this.begin(job);
   }
 
+  /** Hand an in-flight job's product to an fx (hoist/shotgun) before the job is destroyed; the caller disposes it. */
+  release(jobId: number): ProductHandle | null {
+    const h = this.handles.get(jobId) ?? null;
+    this.handles.delete(jobId);
+    this.shaped.delete(jobId);
+    return h;
+  }
+
   restyle(): void {
     for (const h of this.handles.values()) h.restyle();
     for (const i of this.instances) i.restyle?.();
