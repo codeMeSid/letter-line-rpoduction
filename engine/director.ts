@@ -59,15 +59,11 @@ export class Director {
   private nextJobId = 1;
   private backspace: BackspaceHandler | null = null;
   private pending = new Map<ProductKind, number>();
+  private lastKind: ProductKind | null = null;
 
   constructor(private o: DirectorOptions) {
     // a backspace that met a busy row waits for the next removal (shelf/model.ts peekLast ruling)
-    this.events.on('slot:removed', ({ kind }) => {
-      const n = this.pending.get(kind) ?? 0;
-      if (n <= 0) return;
-      this.pending.set(kind, n - 1);
-      this.backspaceCmd(kind);
-    });
+    this.events.on('slot:removed', ({ kind }) => this.retry(kind));
   }
 
   /** Register a factory's line; returns a detach function. */
@@ -104,7 +100,9 @@ export class Director {
 
   handle(cmd: Command): void {
     const kind = this.o.settings().product;
-    if (cmd.type !== 'backspace') this.pending.delete(kind); // typing cancels waiting backspaces
+    // typing cancels every waiting backspace, and so does a backspace in another factory than the last command's
+    if (cmd.type !== 'backspace' || (this.lastKind !== null && this.lastKind !== kind)) this.pending.clear();
+    this.lastKind = kind;
     switch (cmd.type) {
       case 'char':
       case 'space':
@@ -203,17 +201,27 @@ export class Director {
     const target = shelf.peekLast();
     if (!target) return;
     if (target.kind === 'busy') { this.pending.set(kind, (this.pending.get(kind) ?? 0) + 1); return; }
-    if (this.backspace) {
-      this.backspace.handleBackspace(target, { kind, director: this });
-      return;
+    if (this.backspace) this.backspace.handleBackspace(target, { kind, director: this });
+    else if (target.kind === 'newline') shelf.removeNewline();
+    else {
+      if (target.jobId !== null) this.destroyJob(target.jobId);
+      shelf.remove(target.id);
+      this.events.emit('slot:removed', { kind, slotId: target.id });
     }
-    if (target.kind === 'newline') {
-      shelf.removeNewline();
-      return;
+    // undoing a newline emits nothing, so the backspaces that waited behind it carry on here
+    if (target.kind === 'newline') this.retry(kind);
+  }
+
+  /** Run waiting backspaces (one each) while the shelf has a target that is not busy; drop them when nothing is left. */
+  private retry(kind: ProductKind): void {
+    const shelf = this.shelf(kind);
+    while ((this.pending.get(kind) ?? 0) > 0) {
+      const next = shelf.peekLast();
+      if (next?.kind === 'busy') return;
+      if (!next) { this.pending.delete(kind); return; }
+      this.pending.set(kind, (this.pending.get(kind) ?? 0) - 1);
+      this.backspaceCmd(kind);
     }
-    if (target.jobId !== null) this.destroyJob(target.jobId);
-    shelf.remove(target.id);
-    this.events.emit('slot:removed', { kind, slotId: target.id });
   }
 
   private onPhase(kind: ProductKind, job: Job, prev: JobPhase): void {

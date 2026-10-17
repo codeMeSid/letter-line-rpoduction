@@ -177,6 +177,89 @@ describe('Director routing', () => {
     expect(seen).toEqual(['char', 'newline', 'char']);
   });
 
+  it('backspaces waiting behind a newline carry on after it is undone (ab\\ncd, five backspaces)', () => {
+    const { d, typeStr } = setup();
+    const dying: number[] = [];
+    d.setBackspaceHandler({
+      handleBackspace(t, { kind }) {
+        if (t.kind === 'newline') { d.shelf(kind).removeNewline(); return; } // emits nothing
+        d.shelf(kind).markDying(t.id);
+        dying.push(t.id);
+      },
+    });
+    const remove = (id: number) => { d.shelf('bottle').remove(id); d.events.emit('slot:removed', { kind: 'bottle', slotId: id }); };
+    typeStr('ab');
+    d.handle({ type: 'enter' });
+    typeStr('cd');
+    for (let i = 0; i < 5; i++) d.handle({ type: 'backspace' }); // d, c, then three wait behind the newline
+    expect(dying).toHaveLength(2);
+    remove(dying[0]);
+    expect(dying).toHaveLength(2); // the row still holds the dying c
+    remove(dying[1]);              // row empty: the newline goes, then b and a are taken
+    expect(dying).toHaveLength(4);
+    remove(dying[2]);
+    remove(dying[3]);
+    expect(d.shelf('bottle').text()).toBe('');
+    expect(d.shelf('bottle').rows).toHaveLength(1);
+  });
+
+  it('the director\'s own fallback also carries on past an undone newline', () => {
+    const { d, typeStr } = setup();
+    typeStr('a');
+    d.handle({ type: 'enter' });
+    typeStr('b');
+    d.handle({ type: 'enter' });
+    typeStr('c');
+    d.shelf('bottle').markDying(d.shelf('bottle').rows[2][0].id); // a shot is in progress on c
+    for (let i = 0; i < 4; i++) d.handle({ type: 'backspace' });  // busy x4
+    const c = d.shelf('bottle').rows[2][0];
+    d.shelf('bottle').remove(c.id);
+    d.events.emit('slot:removed', { kind: 'bottle', slotId: c.id });
+    expect(d.shelf('bottle').text()).toBe('');
+  });
+
+  it('waiting backspaces do not survive typing or a product switch', () => {
+    const { d, typeStr, settings } = setup();
+    const taken: string[] = [];
+    d.setBackspaceHandler({
+      handleBackspace(t, { kind }) {
+        taken.push(t.kind);
+        if (t.kind === 'newline') { d.shelf(kind).removeNewline(); return; }
+        d.shelf(kind).markDying(t.id);
+      },
+    });
+    const wait = () => {
+      typeStr('ab');
+      d.handle({ type: 'enter' });
+      typeStr('c');
+      d.handle({ type: 'backspace' }); // c dying
+      d.handle({ type: 'backspace' }); // waits
+    };
+    const finish = () => {
+      const c = d.shelf('bottle').rows.at(-1)![0];
+      d.shelf('bottle').remove(c.id);
+      d.events.emit('slot:removed', { kind: 'bottle', slotId: c.id });
+    };
+    wait();
+    settings.product = 'can';
+    d.handle({ type: 'backspace' }); // another factory's backspace drops the bottle's waiting one
+    settings.product = 'bottle';
+    finish();
+    expect(taken).toEqual(['char']);
+    expect(d.shelf('bottle').text()).toBe('ab\n');
+
+    d.handle({ type: 'backspace' }); // undo the newline
+    typeStr('x');
+    d.handle({ type: 'backspace' });
+    d.handle({ type: 'backspace' }); // waits
+    settings.product = 'can';
+    typeStr('z');                    // typing anywhere cancels it
+    settings.product = 'bottle';
+    taken.length = 0;
+    finish();
+    expect(taken).toEqual([]);
+  });
+
   it('backspace removes an in-flight job and its slot', () => {
     const { d, lines, typeStr } = setup();
     const removed: number[] = [];

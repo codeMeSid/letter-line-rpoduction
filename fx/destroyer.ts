@@ -54,7 +54,9 @@ export class Destroyer implements BackspaceHandler {
       case 'reject': // ponytail: Task 16 adds the hoist; until then rejects are shot
       case 'shoot-line': {
         const h = host?.release(plan.jobId) ?? null;
-        const floor = (job?.pos[2] ?? BELT_TOP) - BELT_TOP;
+        // a placing job's z includes the robot's arc, so it falls to the factory floor; belt and station jobs
+        // fall from belt height to the floor of their own level (upper floors in the 'all' layout)
+        const floor = job?.phase === 'placing' ? host?.origin[2] ?? 0 : (job?.pos[2] ?? BELT_TOP) - BELT_TOP;
         director.destroyJob(plan.jobId);
         this.removeSlot(kind, plan.slot.id);
         if (h) this.shoot(kind, h, floor, () => {});
@@ -73,6 +75,11 @@ export class Destroyer implements BackspaceHandler {
   update(dt: number): void {
     this.gun.update(dt);
     this.frags.update(dt);
+  }
+
+  /** Look changed: products waiting for their shot are not in a host or shelf any more, so restyle them here. */
+  restyle(): void {
+    for (const h of this.held) h.restyle();
   }
 
   dispose(): void {

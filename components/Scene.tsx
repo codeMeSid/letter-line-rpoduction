@@ -95,6 +95,7 @@ export default function Scene() {
       looks.apply(r.scene);
       for (const h of hosts.values()) h.restyle();
       for (const site of sites.values()) site.restyle();
+      destroyer.restyle();
       pview.refresh();
       stage.setLook(looks);
       rig.setLook(s.look);

@@ -1,6 +1,8 @@
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import type { ProductKind } from '../engine/types';
 import { Destroyer } from './destroyer';
+import { BELT_TOP } from '../factories/shared/dims';
 import { miniFactory } from './testkit';
 
 function setup(over = {}) {
@@ -17,6 +19,13 @@ function setup(over = {}) {
   const bs = () => f.director.handle({ type: 'backspace' });
   return { ...f, d, step, shelve, bs, flashes };
 }
+
+const chunkMesh = (root: THREE.Object3D): THREE.InstancedMesh => {
+  let m: THREE.InstancedMesh | null = null;
+  root.traverse((o) => { if ((o as THREE.InstancedMesh).isInstancedMesh && o.userData.role === 'steel') m = o as THREE.InstancedMesh; });
+  return m!;
+};
+const zOf = (m: THREE.InstancedMesh, i: number) => m.getMatrixAt(i, new THREE.Matrix4()).elements[14];
 
 describe('Destroyer', () => {
   it('shoots a shelved char: slot dies at once, then (close-up) is removed and the product shatters', () => {
@@ -84,8 +93,8 @@ describe('Destroyer', () => {
     expect(h.root.position.distanceTo(at)).toBeLessThan(1e-6);
     expect(h.root.parent).toBe(t.d.group);
     t.step(1.5);
-    const chunks = t.d.group.children.flatMap((c) => c.children).filter((c) => c.userData.role === 'steel');
-    expect(chunks.length).toBeGreaterThan(0);
+    expect(h.disposed).toBe(true);
+    expect(chunkMesh(t.d.group).count).toBeGreaterThan(0);
   });
   it('a backspace on an empty shelf does nothing', () => {
     const t = setup();
@@ -102,5 +111,49 @@ describe('Destroyer', () => {
     t.d.dispose();
     expect(h.disposed).toBe(true);
     expect(t.d.group.parent).toBeNull();
+  });
+  it('backspaces waiting behind a newline carry on: ab\\ncd + five backspaces empties the shelf', () => {
+    const t = setup();
+    t.type('ab\ncd');
+    t.shelve();
+    for (let i = 0; i < 5; i++) t.bs();
+    t.step(10);
+    expect(t.director.shelf('letter').text()).toBe('');
+    expect(t.director.shelf('letter').rows).toHaveLength(1);
+    expect(t.plays.filter((p) => p === 'shotgun-blast')).toHaveLength(4);
+  });
+  it('a char shot during the robot placement arc shatters onto the factory floor, not mid-air', () => {
+    const t = setup();
+    t.type('a');
+    const [job] = t.director.jobsOf('letter');
+    for (let i = 0; i < 900 && job.phase !== 'placing'; i++) t.step(1 / 30);
+    t.step(0.4); // the arc has lifted the product well above the belt
+    expect(job.phase).toBe('placing');
+    expect(job.pos[2]).toBeGreaterThan(BELT_TOP + 30);
+    t.bs();
+    t.step(2.8); // shot at ~0.7 s; ~2.1 s later the chunks (life 2.5 s) and the shell have landed and stopped hopping
+    const frags = chunkMesh(t.d.group);
+    expect(frags.count).toBeGreaterThan(0);
+    for (let i = 0; i < frags.count; i++) { expect(zOf(frags, i)).toBeGreaterThanOrEqual(0); expect(zOf(frags, i)).toBeLessThan(5); }
+    t.d.group.updateMatrixWorld(true);
+    const hulls: THREE.Object3D[] = [];
+    t.d.group.traverse((o) => { if (o.userData.role === 'paint-accent') hulls.push(o); });
+    expect(hulls.length).toBeGreaterThan(0);
+    for (const o of hulls) expect(o.getWorldPosition(new THREE.Vector3()).z).toBeLessThan(5);
+  });
+  it('restyle reaches products held for their shot, and only those', () => {
+    const t = setup();
+    t.type('a');
+    t.shelve();
+    const h = t.handles[0];
+    let n = 0;
+    h.restyle = () => { n++; };
+    t.bs();
+    t.step(0.1);
+    t.d.restyle();
+    expect(n).toBe(1);
+    t.step(2);
+    t.d.restyle();
+    expect(n).toBe(1);
   });
 });

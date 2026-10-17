@@ -88,14 +88,12 @@ describe('Shotgun', () => {
     run(3.5);
     expect(meshes(g.shells)).toHaveLength(0);
   });
-  it('spent shells stay bounded and clear under spam', () => {
+  it('spent shells are capped at 8 (oldest removed early) and clear after their life', () => {
     const { g, run } = mk();
-    for (let i = 0; i < 12; i++) g.shoot([100 + i * 5, -300, 30], 0, () => {});
-    let most = 0;
-    for (let t = 0; t < 12; t += 1 / 60) { g.update(1 / 60); most = Math.max(most, g.shells.children.length); }
-    expect(most).toBeLessThanOrEqual(8);
-    expect(most).toBeGreaterThan(1);
-    run(5);
+    const eject = (g as unknown as { eject(floor: number): void }).eject.bind(g);
+    for (let i = 0; i < 12; i++) eject(0);
+    expect(g.shells.children).toHaveLength(8);
+    run(3.5);
     expect(g.shells.children).toHaveLength(0);
   });
   it('a shot during the lift reverses back into the next target instead of leaving', () => {
