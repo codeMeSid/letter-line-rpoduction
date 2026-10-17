@@ -1,6 +1,6 @@
 'use client';
 
-import { settingsStore, useSettings } from '../engine/settings';
+import { settingsStore, useSettings, type Settings } from '../engine/settings';
 import { LOOKS, PACES, PRODUCT_KINDS, type Look, type Pace, type ProductKind, type Quality } from '../engine/types';
 import { FACTORIES } from '../factories/registry';
 
@@ -46,6 +46,18 @@ export default function Hud() {
       <label>Camera
         <select value={s.camera} onChange={(e) => { e.target.blur(); set({ camera: e.target.value as (typeof CAMERAS)[number] }); }} disabled={s.pace === 'cinematic'}>
           {CAMERAS.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </label>
+      <label>Backspace
+        <select value={s.backspaceStyle} onChange={(e) => { e.target.blur(); set({ backspaceStyle: e.target.value as Settings['backspaceStyle'] }); }}>
+          <option value="closeup">Close up</option>
+          <option value="debris">Debris + broom</option>
+        </select>
+      </label>
+      <label>On the line
+        <select value={s.inflightBackspace} onChange={(e) => { e.target.blur(); set({ inflightBackspace: e.target.value as Settings['inflightBackspace'] }); }}>
+          <option value="reject">Reject chute</option>
+          <option value="shoot">Shoot</option>
         </select>
       </label>
       <label>Theme

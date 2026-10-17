@@ -77,7 +77,7 @@ export default function Scene() {
     });
 
     const destroyer = new Destroyer({
-      director, looks, particles, audio, settings, hosts,
+      director, looks, particles, audio, settings, hosts, sites,
       flash: (p) => stage.flash(p), shake: (m) => rig.shake(m),
     });
     world.add(destroyer.group);
