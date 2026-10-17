@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { AudioBus } from '@/audio/bus';
 import { CameraRig, type CameraMode } from '@/engine/camera';
-import { SITE_SIZE, SITE_Y0 } from '@/engine/campus';
 import { Director } from '@/engine/director';
 import { FactoryHost } from '@/engine/factoryHost';
 import { keyRoute, keyToCommand } from '@/engine/input';
@@ -19,7 +18,7 @@ import { createRenderer } from '@/engine/renderer';
 import { settingsStore, type Settings } from '@/engine/settings';
 import { createStage } from '@/engine/stage';
 import { PRODUCT_KINDS, type LayoutMode, type ProductKind, type Vec3 } from '@/engine/types';
-import { FACTORIES, factoryOrigin, PLOTS, plotOf } from '@/factories/registry';
+import { FACTORIES, factoryOrigin, PLOTS } from '@/factories/registry';
 import { ConstructionSite } from '@/fx/construction';
 import { buildGround } from '@/fx/ground';
 import { FactorySite } from '@/fx/site';
@@ -65,11 +64,8 @@ export default function Scene() {
     const yardOf = new Map<ProductKind, ConstructionSite>();
     for (const p of PLOTS) if (!p.built) { const c = new ConstructionSite(looks, p); world.add(c.group); yardOf.set(p.kind, c); }
     const yards = [...yardOf.values()];
-    const boundsOf = (kind: ProductKind): { min: Vec3; max: Vec3 } => {
-      const site = sites.get(kind);
-      if (site) return site.bounds(); // the whole building, so the back wall and sign are in frame
-      return yardOf.get(kind)?.bounds() ?? { min: [plotOf(kind).x0, SITE_Y0, 0], max: [plotOf(kind).x1, SITE_Y0 + SITE_SIZE[1], 200] }; // the crane sets the height
-    };
+    // every kind is a built host (machines + shelf in frame) or an unbuilt plot (the crane sets the height)
+    const boundsOf = (kind: ProductKind): { min: Vec3; max: Vec3 } => hosts.get(kind)?.bounds() ?? yardOf.get(kind)!.bounds();
     const active = () => hosts.get(settings().product) ?? null;
     const overview = () => boundsOf(settings().product);
     const rig = new CameraRig({
@@ -90,7 +86,7 @@ export default function Scene() {
       looks.set(lookOpts(s));
       looks.apply(r.scene);
       for (const h of hosts.values()) h.restyle();
-      for (const s of sites.values()) s.restyle();
+      for (const site of sites.values()) site.restyle();
       pview.refresh();
       stage.setLook(looks);
       rig.setLook(s.look);
@@ -181,7 +177,7 @@ export default function Scene() {
       document.removeEventListener('visibilitychange', onVisible);
       offLoop();
       loop.dispose();
-      for (const s of sites.values()) s.dispose();
+      for (const site of sites.values()) site.dispose();
       for (const y of yards) y.dispose();
       ground.dispose();
       for (const h of hosts.values()) h.destroy();

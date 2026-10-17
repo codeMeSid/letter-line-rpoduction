@@ -6,7 +6,7 @@ import type { Looks } from '../engine/looks';
 import type { ParticleSystem } from '../engine/particles';
 import type { ProductHandle } from '../engine/product';
 import type { Settings } from '../engine/settings';
-import type { Job, Vec3 } from '../engine/types';
+import type { Job } from '../engine/types';
 import { buildBuilding, type Building } from '../factories/shared/building';
 
 export interface SiteDeps { looks: Looks; director: Director; audio: AudioBus; particles: ParticleSystem; settings: () => Settings }
@@ -19,7 +19,6 @@ export class FactorySite {
   readonly group = new THREE.Group();
   building!: Building;
   private sign: ProductHandle | null = null;
-  private box: { min: Vec3; max: Vec3 } = { min: [0, 0, 0], max: [0, 0, 0] };
 
   constructor(readonly host: FactoryHost, private d: SiteDeps, parent: THREE.Object3D) {
     parent.add(this.group);
@@ -38,9 +37,6 @@ export class FactorySite {
 
   restyle(): void { this.sign?.restyle(); }
 
-  /** The whole building (walls, sign, dock apron): what the overview camera frames. */
-  bounds(): { min: Vec3; max: Vec3 } { return { min: [...this.box.min], max: [...this.box.max] }; }
-
   dispose(): void {
     this.clear();
     this.group.removeFromParent();
@@ -50,8 +46,6 @@ export class FactorySite {
     const height = Math.max(BUILDING_MIN_H, this.host.layout.bounds.max[2] + 160);
     this.building = buildBuilding(this.d.looks, this.host.floorBox(), height);
     this.group.add(this.building.group);
-    const bb = new THREE.Box3().setFromObject(this.building.group);
-    this.box = { min: [bb.min.x, bb.min.y, 0], max: [bb.max.x, bb.max.y, bb.max.z] };
     const def = this.host.def;
     const stage = def.product.stages[def.product.stages.length - 1];
     const job: Job = {

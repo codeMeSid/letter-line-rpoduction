@@ -115,6 +115,65 @@ describe('CameraRig', () => {
       }
       expect(rig.center().x).toBeCloseTo(x0 + 150, 6);
     });
+    describe('with a mutable overview (flights)', () => {
+      const A = { min: [0, -300, 0] as Vec3, max: [900, 0, 100] as Vec3 };
+      const B = { min: [3000, -300, 0] as Vec3, max: [3900, 0, 100] as Vec3 };
+      const mk = () => {
+        const ref = { box: A };
+        const rig = new CameraRig({ overview: () => ref.box, newest: () => null, busiest: () => null, followSpan: () => 400 });
+        rig.resize(1280, 800, 1);
+        rig.snap();
+        rig.attach(dom());
+        return { rig, ref, c: rig['controls']! };
+      };
+      it('a flight started inside the hold window lands on the new overview and stays there', () => {
+        const { rig, ref, c } = mk();
+        c.dispatchEvent({ type: 'start' }); // orbit / wheel, then let go: the 4 s hold window is open
+        c.dispatchEvent({ type: 'end' });
+        ref.box = B;
+        rig.fly(A, 0);
+        for (let t = 0; t <= FLIGHT_MS; t += 100) rig.update(1 / 60, t);
+        expect(rig.flying).toBe(false);
+        expect(rig.center().x).toBeCloseTo(3450, 3);
+        for (let i = 0; i < 30; i++) rig.update(1 / 60, FLIGHT_MS + 16 * (i + 1)); // still inside the old hold window
+        expect(rig.center().x).toBeCloseTo(3450, 3);
+      });
+      it('a user orbit before fly(): the view direction eases to the goal in the pull-out, no snap at the start', () => {
+        const { rig, ref, c } = mk();
+        c.dispatchEvent({ type: 'start' });
+        const off = c.object.position.clone().sub(c.target).applyAxisAngle(new THREE.Vector3(0, 0, 1), 0.6);
+        c.object.position.copy(c.target).add(off);
+        rig.update(1 / 60, 0); // dragging: the rig adopts the orbit
+        c.dispatchEvent({ type: 'end' });
+        const orbit = rig['dir'].clone();
+        const goal = new THREE.Vector3(...viewDir('realistic'));
+        expect(orbit.angleTo(goal)).toBeGreaterThan(0.3);
+        ref.box = B;
+        rig.fly(A, 1000);
+        rig.update(1 / 60, 1000);
+        expect(rig['dir'].distanceTo(orbit)).toBeLessThan(1e-9);
+        rig.update(1 / 60, 1000 + FLIGHT_MS * 0.125);
+        const mid = rig['dir'].clone();
+        expect(mid.angleTo(orbit)).toBeGreaterThan(0.05);
+        expect(mid.angleTo(goal)).toBeGreaterThan(0.05);
+        rig.update(1 / 60, 1000 + FLIGHT_MS * 0.25);
+        expect(rig['dir'].distanceTo(goal)).toBeLessThan(1e-9);
+      });
+      it('the shake is not applied (nor adopted) while the user holds the camera', () => {
+        const { rig, c } = mk();
+        rig.update(1 / 60, 0);
+        const p0 = rig.active().position.clone();
+        rig.shake(1);
+        rig.update(1 / 60, 16);
+        expect(rig.active().position.distanceTo(p0)).toBeGreaterThan(0.5); // free camera: kicked
+        c.dispatchEvent({ type: 'start' });
+        for (let i = 0; i < 5; i++) rig.update(1 / 60, 32 + i * 16);
+        expect(rig.active().position.distanceTo(p0)).toBeLessThan(1e-3);
+        c.dispatchEvent({ type: 'end' });
+        for (let i = 0; i < 120; i++) rig.update(1 / 60, 200 + i * 16);
+        expect(rig.active().position.distanceTo(p0)).toBeLessThan(1e-3); // and nothing was baked in
+      });
+    });
     it('clamps: never below the floor plane, sane dolly distance and ortho zoom', () => {
       const { rig, c } = rigWithControls();
       expect(c.maxPolarAngle).toBeLessThan(Math.PI / 2);
@@ -132,6 +191,17 @@ describe('CameraRig', () => {
       expect(rig.center().halfWidth).toBeLessThan(1e4);
       expect(rig.center().halfWidth).toBeGreaterThan(inMost);
     });
+  });
+  it('the perspective near plane is at least 1 and grows with the view distance', () => {
+    const ref = { box: { min: [0, -300, 0] as Vec3, max: [900, 0, 100] as Vec3 } };
+    const rig = new CameraRig({ overview: () => ref.box, newest: () => null, busiest: () => null, followSpan: () => 400 });
+    rig.resize(1280, 800, 1);
+    rig.snap();
+    const near = rig.persp.near;
+    expect(near).toBeGreaterThanOrEqual(1);
+    ref.box = { min: [0, -300, 0], max: [8000, 0, 100] };
+    rig.snap();
+    expect(rig.persp.near).toBeGreaterThan(near);
   });
   it('switches projection with the look', () => {
     const rig = new CameraRig({ overview: () => ({ min: [0, 0, 0], max: [100, 100, 100] }), newest: () => null, busiest: () => null, followSpan: () => 400 });

@@ -40,11 +40,20 @@ describe('buildBuilding', () => {
     expect(b.dockPark[0]).toBeLessThan(box.x1);
   });
   it('night swaps window glass for glow', () => {
-    const glow = () => meshes(b.group).filter((m) => m.userData.role === 'glow' && m.visible).length;
+    const shown = (role: string) => meshes(b.group).filter((m) => m.userData.role === role && m.visible).length;
     b.setNight(false);
-    const day = glow();
+    const day = shown('glow');
+    expect(shown('glass')).toBeGreaterThan(0);
     b.setNight(true);
-    expect(glow()).toBeGreaterThan(day);
+    expect(shown('glow')).toBeGreaterThan(day);
+    expect(shown('glass')).toBe(0);
+    b.setNight(false);
+  });
+  it('the sign board is not coplanar with the eave cap front face (z-fight)', () => {
+    const board = meshes(b.group).find((m) => m.userData.role === 'paint' && new THREE.Box3().setFromObject(m).max.z > 320 + 40)!;
+    const bb = new THREE.Box3().setFromObject(board);
+    expect(bb.min.y).toBeLessThan(box.y1 - 8 - 2 - 0.2); // in front of the cap (cap front = y1 - T - 2)
+    expect(b.signAt[1]).toBeCloseTo(bb.min.y - 14, 6);
   });
   it('dispose detaches and disposes geometry', () => {
     const p = new THREE.Group();

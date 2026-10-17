@@ -24,6 +24,7 @@ const MAX_POLAR = Math.PI / 2 - 0.02;
 const DOLLY: [number, number] = [60, 10000];
 const ORTHO_EXTENT: [number, number] = [30, 4000];
 const Z = new THREE.Vector3(0, 0, 1);
+const ss = (t: number) => t * t * (3 - 2 * t);
 
 const norm = (v: Vec3): Vec3 => {
   const l = Math.hypot(v[0], v[1], v[2]);
@@ -75,7 +76,7 @@ export class CameraRig {
   private userUntil = -Infinity;
   private cineAt = -Infinity;
   private cineTarget: Vec3 | null = null;
-  private flight: { from: Pose; box: { min: Vec3; max: Vec3 }; t0: number } | null = null;
+  private flight: { from: Pose; dir: Vec3; box: { min: Vec3; max: Vec3 }; t0: number } | null = null;
   private shakeAmt = 0;
   private shakeOff = new THREE.Vector3();
   private aimAt = new THREE.Vector3();
@@ -130,7 +131,8 @@ export class CameraRig {
 
   /** Fly from the current pose to the (already switched) overview: pull out, pan, push in. `from` = the old factory's box. */
   fly(from: { min: Vec3; max: Vec3 }, now: number): void {
-    this.flight = { from: { target: [this.target.x, this.target.y, this.target.z], extent: this.extent }, box: from, t0: now };
+    this.flight = { from: { target: [this.target.x, this.target.y, this.target.z], extent: this.extent }, dir: [this.dir.x, this.dir.y, this.dir.z], box: from, t0: now };
+    this.userUntil = -Infinity; // a pending hold window must not hijack the camera when the flight lands
   }
 
   get flying(): boolean { return this.flight !== null; }
@@ -153,12 +155,19 @@ export class CameraRig {
       const p = flightPose(u, f.from, { target: g.target, extent: g.extent }, wide);
       this.target.set(...p.target);
       this.extent = p.extent;
-      this.dir.set(...g.dir);
-      if (u >= 1) this.flight = null;
+      // the view direction eases to the goal during the pull-out (no snap after a user orbit); afterwards it is the goal
+      const k = u >= 0.25 ? 1 : ss(Math.max(0, u) / 0.25);
+      if (k >= 1) this.dir.set(...g.dir);
+      else this.dir.set(...f.dir).lerp(this.aimAt.set(...g.dir), k).normalize();
+      if (u >= 1) {
+        this.flight = null;
+        this.controls?.target.copy(this.target); // OrbitControls must start from where the flight landed
+      }
       this.apply();
       return true;
     }
     if (this.controls && (this.dragging || now < this.userUntil)) {
+      this.active().position.sub(this.shakeOff); // OrbitControls must not adopt the shake kick
       this.controls.update();
       this.readBack();
       return true;
@@ -221,16 +230,17 @@ export class CameraRig {
     } else {
       this.extent = cam.position.distanceTo(this.target);
     }
-    this.apply();
+    this.apply(false); // no shake while the user holds the camera (it would be baked into the view)
   }
 
-  private apply(): void {
+  private apply(shake = true): void {
     const ortho = this.isOrtho();
     const cam = this.active();
     // shake: the same random kick on the position and the look-at point (a pure translation); exactly zero when settled
     this.aimAt.copy(this.target);
     cam.position.copy(this.target).addScaledVector(this.dir, ortho ? 5000 : this.extent);
-    if (this.shakeAmt > 0) {
+    this.shakeOff.set(0, 0, 0);
+    if (shake && this.shakeAmt > 0) {
       const k = this.shakeAmt * 0.015 * (ortho ? this.extent : this.extent * TAN);
       this.shakeOff.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(2 * k);
       cam.position.add(this.shakeOff);

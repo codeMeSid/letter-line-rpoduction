@@ -177,7 +177,7 @@ export function buildBuilding(looks: Looks, floor: Box2, height: number): Buildi
   }
 
   // ---- sign (rises above the back wall, centred) ----
-  const sy = y1 - SIGN.d / 2; // board flush with the back face
+  const sy = y1 - SIGN.d / 2 - 0.5; // board front 0.5 proud of the eave cap's front face (they would z-fight if coplanar)
   const sz = H - 30;
   place(box(looks, SIGN.w, SIGN.d, SIGN.h, 'paint'), cx, sy, sz);
   const fw = SIGN.w + 6;
@@ -185,7 +185,7 @@ export function buildBuilding(looks: Looks, floor: Box2, height: number): Buildi
     cube(cx - fw / 2, cx + fw / 2, sy - 7, sy + 5, sz - 3, sz), cube(cx - fw / 2, cx + fw / 2, sy - 7, sy + 5, sz + SIGN.h, sz + SIGN.h + 3),
     cube(cx - fw / 2, cx - fw / 2 + 3, sy - 7, sy + 5, sz, sz + SIGN.h), cube(cx + fw / 2 - 3, cx + fw / 2, sy - 7, sy + 5, sz, sz + SIGN.h),
   ], 'steel');
-  const signAt: Vec3 = [cx, y1 - SIGN.d - 14, sz + 6];
+  const signAt: Vec3 = [cx, sy - SIGN.d / 2 - 14, sz + 6];
 
   // ---- reject chute (steel U-trough on two legs) + bin ----
   const chuteTop: Vec3 = [cx - 70, y1 - 34, 150];
