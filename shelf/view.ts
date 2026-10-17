@@ -9,7 +9,9 @@ const MARGIN = 12;   // plank overhang past the first/last slot
 const GAP_X = 8;     // between neighbouring products
 const PLANK = 4;
 const BASE = 18;     // plank top above the floor (every row)
-const ROW_PITCH = 40; // each older row steps back (+y, toward the robot) on the same level
+const ROW_PITCH = 32; // each older row steps back (+y, toward the robot), up to level 3 (back edge ~+106: clear of the robot rail's sleepers from +124)
+const MAX_STEP = 3;   // deepest level; rows beyond it stack upward in tiers at that same y
+const TIER = 40;      // z step per tier above level 3
 
 /** Plank length for a product slot size (MARGIN both ends + one pitch per column). */
 export const shelfWidth = (size: Vec3, cols = SHELF_COLS): number => MARGIN * 2 + cols * (size[0] + GAP_X);
@@ -38,6 +40,9 @@ export class ShelfView {
   }
 
   get width(): number { return shelfWidth(this.size, this.shelf.cols); }
+
+  /** Product height (z), for the forklift's carry clearance. */
+  get productHeight(): number { return this.size[2]; }
 
   /** The planks are rebuilt snapped at the new origin on the next update/rowEnd. */
   setOrigin(o: Vec3): void { this.origin = o; this.clearPlanks(); }
@@ -75,7 +80,7 @@ export class ShelfView {
     const plank = this.rowGroups.get(row);
     if (!plank) return null;
     const load = new THREE.Group();
-    this.group.add(load);
+    this.group.add(load); // (attach keeps world transforms; the detached load's local matrix then stands for world)
     load.attach(plank);
     this.rowGroups.delete(row);
     this.released.add(row);
@@ -99,10 +104,10 @@ export class ShelfView {
     this.syncRows();
     const g = this.rowGroups.get(row);
     if (!g) return null;
-    const [ox, , oz] = this.origin;
+    const [ox] = this.origin;
     this.end[0] = ox + this.width;
     this.end[1] = g.position.y;
-    this.end[2] = oz + BASE;
+    this.end[2] = g.position.z + BASE; // the plank's own (damped, tiered) height
     return this.end;
   }
 
@@ -111,7 +116,7 @@ export class ShelfView {
     const [ox, oy, oz] = this.origin;
     return {
       min: [ox, oy - this.depth / 2, oz],
-      max: [ox + this.width, oy + (n - 1) * ROW_PITCH + this.depth / 2, oz + BASE + this.size[2]],
+      max: [ox + this.width, oy + Math.min(n - 1, MAX_STEP) * ROW_PITCH + this.depth / 2, oz + this.tierZ(n - 1) + BASE + this.size[2]],
     };
   }
 
@@ -120,12 +125,15 @@ export class ShelfView {
     const a = 1 - Math.exp(-dt * 8);
     let moving = false;
     const rows = this.shelf.rows;
-    const oy = this.origin[1];
+    const [, oy, oz] = this.origin;
     for (let r = 0; r < rows.length; r++) {
       const g = this.rowGroups.get(rows[r]);
       if (!g) continue;
-      const dy = oy + this.level(r) * ROW_PITCH - g.position.y;
-      if (Math.abs(dy) > 0.01) { g.position.y += dy * a; moving = true; } else g.position.y += dy;
+      const L = this.level(r);
+      const dy = oy + Math.min(L, MAX_STEP) * ROW_PITCH - g.position.y;
+      const dz = oz + this.tierZ(L) - g.position.z;
+      if (Math.abs(dy) > 0.01 || Math.abs(dz) > 0.01) { g.position.y += dy * a; g.position.z += dz * a; moving = true; } else { g.position.y += dy; g.position.z += dz; }
+      this.fitRack(g, oz);
     }
     for (const [id, h] of this.placed) {
       const slot = this.shelf.getSlot(id);
@@ -160,6 +168,16 @@ export class ShelfView {
 
   private level(row: number): number { return this.shelf.rows.length - 1 - row; }
 
+  /** Rise of a level above the base height: 0 up to level 3, then one tier per level. */
+  private tierZ(L: number): number { return Math.max(0, L - MAX_STEP) * TIER; }
+
+  /** Stretch the posts (and drop the foot) so they always reach the floor under a raised plank. */
+  private fitRack(g: THREE.Group, oz: number): void {
+    const [posts, foot] = g.userData.rack as [THREE.Group, THREE.Object3D];
+    const lift = g.position.z - oz;
+    posts.position.z = foot.position.z = -lift;
+    posts.scale.z = (BASE - PLANK + lift) / (BASE - PLANK);
+  }
   /** Every row is drawn; the forklift keeps their number down. */
   private shown(): number { return Math.max(1, this.shelf.rows.length); }
 
@@ -167,7 +185,7 @@ export class ShelfView {
     const L = this.level(row);
     const [ox, oy, oz] = this.origin;
     // y: the product stands just in front of the plank (its back face flush with the plank's front face), so a descender below the plank top stays visible.
-    return [ox + MARGIN + (col + 0.5) * this.pitch, oy + L * ROW_PITCH - this.depth / 2 - this.size[1] / 2, oz + BASE];
+    return [ox + MARGIN + (col + 0.5) * this.pitch, oy + Math.min(L, MAX_STEP) * ROW_PITCH - this.depth / 2 - this.size[1] / 2, oz + this.tierZ(L) + BASE];
   }
 
   private clearPlanks(): void {
@@ -185,7 +203,8 @@ export class ShelfView {
     for (let r = 0; r < rows.length; r++) {
       if (this.rowGroups.has(rows[r]) || this.released.has(rows[r])) continue;
       const g = this.buildPlank();
-      g.position.set(ox, oy + this.level(r) * ROW_PITCH, oz);
+      g.position.set(ox, oy + Math.min(this.level(r), MAX_STEP) * ROW_PITCH, oz + this.tierZ(this.level(r)));
+      this.fitRack(g, oz);
       this.group.add(g);
       this.rowGroups.set(rows[r], g);
     }
@@ -197,14 +216,16 @@ export class ShelfView {
     const plank = housing(this.looks, this.width, this.depth, PLANK, 'wood', 1);
     plank.position.set(this.width / 2, 0, BASE - PLANK);
     g.add(plank);
+    const posts = new THREE.Group(); // stretched to the floor by fitRack
     for (const x of [3, this.width / 2, this.width - 3]) {
       const post = column(this.looks, 2, BASE - PLANK, 'steel', 10);
       post.position.set(x, this.depth / 2 - 3, 0);
-      g.add(post);
+      posts.add(post);
     }
     const foot = box(this.looks, this.width, 6, 3, 'steel');
     foot.position.set(this.width / 2, this.depth / 2 - 3, 0);
-    g.add(foot);
+    g.add(posts, foot);
+    g.userData.rack = [posts, foot];
     return g;
   }
 }

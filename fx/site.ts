@@ -52,14 +52,17 @@ export class FactorySite {
     const shelf = this.d.director.shelf(this.host.def.kind);
     if (!this.forklift.busy && shelf.readyToShip()) {
       const row = shelf.rows[0];
+      const view = this.host.shelfView;
       this.forklift.fetch(
         () => this.host.shelfView.rowEnd(row),
         () => {
           if (shelf.rows[0] !== row || !shelf.readyToShip()) return null; // gone, or backspaced down to three rows while it drove over
           const load = this.host.shelfView.releaseRow(row);
+          if (!load) return null;
           this.d.director.shipRow(this.host.def.kind);
           return load;
         },
+        view.span().z + view.productHeight, // the other rows' product tops
       );
     }
     this.forklift.update(realDt, 1 + Math.max(0, shelf.rows.length - SHELF_ROWS - 1)); // rows waiting: it hurries

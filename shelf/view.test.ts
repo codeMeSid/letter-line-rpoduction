@@ -14,7 +14,7 @@ const handle = (): ProductHandle & { disposed: boolean; placedT: number } => {
 const job = (slotId: number, isSpace = false): Job => ({ id: slotId, slotId, char: 'a', isSpace, special: 'none', product: 'letter', stage: 'polished', phase: 'shelved', stationIndex: 6, progress: 1, pos: [0, 0, 0], defect: false, retries: 0 });
 
 describe('ShelfView', () => {
-  it('slots run +x along the front plank; new rows push older rows 40 back at the same height', () => {
+  it('slots run +x along the front plank; new rows push older rows 32 back at the same height', () => {
     const shelf = new Shelf();
     const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
     const a = shelf.reserve('char', 'a');
@@ -27,7 +27,7 @@ describe('ShelfView', () => {
     shelf.reserve('char', 'c');
     const pa2 = v.slotPos(a.slotId)!;
     expect(pa2[2]).toBe(pa[2]);
-    expect(pa2[1]).toBe(pa[1] + 40);
+    expect(pa2[1]).toBe(pa[1] + 32);
   });
   it('draws a plank group per row; a new row makes older planks glide back', () => {
     const shelf = new Shelf();
@@ -39,10 +39,10 @@ describe('ShelfView', () => {
     v.update(1 / 60);
     const moved = v.rowEnd(first)![1] + 400;
     expect(moved).toBeGreaterThan(0);
-    expect(moved).toBeLessThan(40);
+    expect(moved).toBeLessThan(32);
     expect(v.rowEnd(shelf.rows[1])![1]).toBe(-400); // the new row appears in place at the front
     v.update(2);
-    expect(v.rowEnd(first)![1]).toBeCloseTo(-360, 3);
+    expect(v.rowEnd(first)![1]).toBeCloseTo(-368, 3);
     for (let r = 0; r < 3; r++) shelf.newline();
     v.update(0);
     expect(shelf.rows).toHaveLength(5);
@@ -127,7 +127,7 @@ describe('ShelfView', () => {
     expect(shelf.rows).toHaveLength(4);
     v.update(0);
     v.group.updateMatrixWorld(true);
-    const limit = v.span().y + 150; // robot rail; the carriage face (limit - 20) is only grazed by 1 unit, at floor level below the carriage
+    const limit = v.span().y + 150 - 26; // robot rail centre minus its sleepers' half-width (rail +-14, sleepers +-26)
     let n = 0;
     v.group.traverse((o) => {
       if (!(o as THREE.Mesh).isMesh) return;
@@ -135,6 +135,31 @@ describe('ShelfView', () => {
       expect(new THREE.Box3().setFromObject(o).max.y).toBeLessThan(limit);
     });
     expect(n).toBe(4 * 5); // a plank, three posts and a foot per row
+  });
+  it('rows beyond level 3 stack upward in tiers at level 3\'s y, posts reaching the floor; slots and products follow', () => {
+    const shelf = new Shelf();
+    const v = new ShelfView(new THREE.Group(), shelf, [26, 8, 32], looks, [0, -400, 0]);
+    const slots = [0, 1, 2, 3, 4, 5].map((r) => { if (r) shelf.newline(); return shelf.reserve('char', 'a'); });
+    v.update(0);
+    v.group.updateMatrixWorld(true);
+    // rows 0..5 are levels 5..0
+    const y = (i: number) => v.slotPos(slots[i].slotId)!;
+    expect(y(2)[1]).toBe(y(3)[1] + 32); // level 3 is one pitch behind level 2
+    expect(y(1)[1]).toBe(y(2)[1]);
+    expect(y(0)[1]).toBe(y(2)[1]);
+    expect(y(2)[2]).toBe(18);
+    expect(y(1)[2]).toBe(18 + 40);
+    expect(y(0)[2]).toBe(18 + 80);
+    expect(v.rowEnd(shelf.rows[0])![2]).toBe(18 + 80); // the oldest (top tier) plank top
+    expect(v.rowEnd(shelf.rows[5])![2]).toBe(18);
+    let planks = 0;
+    v.group.children.forEach((g) => {
+      const b = new THREE.Box3().setFromObject(g);
+      planks++;
+      expect(b.min.z).toBeCloseTo(0, 3); // the rack reaches the floor
+      expect(b.max.y).toBeLessThan(v.span().y + 150 - 26);
+    });
+    expect(planks).toBe(6);
   });
   it('row 0 slots stand just in front of the plank (back face flush with its front face)', () => {
     const shelf = new Shelf();

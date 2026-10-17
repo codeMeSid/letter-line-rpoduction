@@ -25,7 +25,7 @@ function mk(over: { onLift?: boolean } = {}) {
   plank.geometry.addEventListener('dispose', () => geomDisposed++);
   const state = { lifts: 0, liftAt: -1, t: 0 };
   const handle: ProductHandle = h;
-  fk.fetch(() => END, () => { state.lifts++; state.liftAt = state.t; return over.onLift === false ? null : { group, handles: [handle] }; });
+  fk.fetch(() => END, () => { state.lifts++; state.liftAt = state.t; return over.onLift === false ? null : { group, handles: [handle] }; }, END[2] + 32); // other rows' product tops
   const run = (s: number, speed = 1, each?: () => void) => {
     for (let t = 0; t < s - 1e-9; t += 1 / 60) { state.t += 1 / 60 / speed; fk.update(1 / 60, speed); each?.(); }
   };
@@ -56,7 +56,6 @@ describe('Forklift', () => {
   });
   it('inserts the forks under the plank end (fork base 6 past it), then the load rides the carriage up at least 10', () => {
     const t = mk();
-    t.run(t.state.liftAt < 0 ? 3.3 : 0);
     while (t.state.lifts === 0) t.run(1 / 60);
     // at lift start: forks aligned with the row (y) and 6 past its end (x), facing -x
     expect(t.fk.truck.position.x).toBeCloseTo(END[0] + 6, 3);
@@ -68,9 +67,6 @@ describe('Forklift', () => {
     t.run(0.7);
     expect(worldZ(t.plank) - z0).toBeGreaterThanOrEqual(10);
     expect(worldZ(t.plank) - z0).toBeLessThan(60);
-    // the forks go under the plank: their tops stay below its underside (z 14)
-    t.run(1);
-    expect(t.h.disposed).toBe(false);
   });
   it('the forks slide under the plank end without touching it or its posts, 84 long', () => {
     const t = mk();
@@ -98,25 +94,43 @@ describe('Forklift', () => {
     expect(under).toBeGreaterThan(20);
     expect(END[0] - minX).toBeCloseTo(84, 3);
   });
-  it('swings the plank round high enough to clear the other rows, and brings it back down before the dock door lintel', () => {
+  it('never turns: the heading stays -x for the whole trip, and the forks face the shelf throughout', () => {
+    const t = mk();
+    let n = 0;
+    t.run(16, 1, () => { n++; expect(t.fk.truck.rotation.z).toBe(0); });
+    expect(n).toBeGreaterThan(500);
+    expect(t.fk.busy).toBe(false);
+  });
+  it('raises the load to the travel height (plank underside 6 above the other rows\' product tops) and keeps it there until shed; no lowering', () => {
     const t = mk();
     while (t.state.lifts === 0) t.run(1 / 60);
     const z0 = worldZ(t.plank);
-    let riseAtSwing = 1e9;
-    let riseAtDoor = -1;
+    const want = END[2] + 32 + 6 - (END[2] - 4); // rise that puts the underside at product top + 6
+    let reached = false;
+    let minAfter = 1e9;
     let maxRise = 0;
-    t.run(14, 1, () => {
-      const rise = worldZ(t.plank) - z0;
+    t.run(16, 1, () => {
       if (!t.group.parent || t.h.disposed) return;
+      const rise = worldZ(t.plank) - z0;
       maxRise = Math.max(maxRise, rise);
-      const yaw = ((t.fk.truck.rotation.z % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      if (yaw > 0.3 && yaw < 1.5) riseAtSwing = Math.min(riseAtSwing, rise); // the plank is sweeping over the rows
-      if (Math.abs(t.fk.truck.position.x - (DOOR[0] - 20)) < 1.5 && yaw > 2.5) riseAtDoor = rise;
+      if (rise > want - 0.1) reached = true;
+      if (reached) minAfter = Math.min(minAfter, rise);
     });
-    expect(riseAtSwing).toBeGreaterThanOrEqual(35); // plank underside >= 49: above letters standing on the other rows (top 50) within a unit or two
-    expect(maxRise).toBeLessThanOrEqual(40.5);
-    expect(riseAtDoor).toBeGreaterThan(0);
-    expect(riseAtDoor).toBeLessThanOrEqual(14.5); // letters (top ~64) pass under the lintel at z 78
+    expect(reached).toBe(true);
+    expect(minAfter).toBeGreaterThan(want - 0.1);
+    expect(maxRise).toBeLessThan(want + 0.1);
+  });
+  it('carried products pass under the door lintel (z 110) when they cross the door line', () => {
+    const t = mk();
+    let crossed = 0;
+    const box = new THREE.Box3();
+    t.run(16, 1, () => {
+      if (!t.group.parent || t.h.disposed) return;
+      t.h.root.updateWorldMatrix(true, true);
+      box.setFromObject(t.h.root);
+      if (box.min.x <= DOOR[0] && box.max.x >= DOOR[0]) { crossed++; expect(box.max.z).toBeLessThan(110); }
+    });
+    expect(crossed).toBeGreaterThan(10);
   });
   it('plays the motor and the reversing beep', () => {
     const t = mk();
@@ -140,7 +154,7 @@ describe('Forklift', () => {
     expect(carried).toBe(true);
     expect(t.fk.busy).toBe(false);
     expect(dist(t.fk, PARK)).toBeLessThan(1);
-    expect(Math.cos(t.fk.truck.rotation.z)).toBeGreaterThan(0.9999); // facing -x again
+    expect(t.fk.truck.rotation.z).toBe(0); // never turned
     expect(t.fk.truck.position.z).toBe(0);
   });
   it('the whole trip takes about 10 s at speed 1 and a third of that at speed 3', () => {
@@ -268,5 +282,21 @@ describe('Forklift', () => {
     t.run(14);
     expect(other).toBe(0);
     expect(t.state.lifts).toBe(1);
+  });
+  it('a top-tier plank is lifted at its own z, and the travel height is relative to it', () => {
+    const looks = new Looks({ look: 'realistic', theme: 'dark', colorMode: 'accent', quality: 'high' });
+    const fk = new Forklift(looks, fakeAudio().audio, PARK, DOOR);
+    const top: Vec3 = [900, -440, 98];
+    const plank = looks.part(new THREE.BoxGeometry(500, 22, 4), 'wood');
+    plank.position.set(650, -440, 96);
+    const group = new THREE.Group();
+    group.add(plank);
+    let liftZ = -1;
+    fk.fetch(() => top, () => { liftZ = fk.group.getObjectByName('carriage')!.getWorldPosition(new THREE.Vector3()).z; return { group, handles: [] }; }, 50);
+    for (let i = 0; i < 60 * 8 && liftZ < 0; i++) fk.update(1 / 60, 1);
+    expect(liftZ).toBeCloseTo(98 - 6, 1); // forks go in 6 under the tier's plank top, not at the base level
+    const z0 = worldZ(plank);
+    for (let i = 0; i < 60 * 3; i++) fk.update(1 / 60, 1);
+    expect(worldZ(plank) - z0).toBeCloseTo(14, 0); // the others are far below: only the lift, not the full clearance
   });
 });

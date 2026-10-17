@@ -18,17 +18,20 @@ const AHEAD = 100;        // aligned point: this far past the plank end
 const TUCK = 6;           // inserted: the fork base stands this far past the plank end (84 of the 90 long forks run under it)
 const LIFT_T = 0.5;
 const LIFT = 14;          // carriage rise that takes the plank off the posts
-const TRAVEL = 40;        // total rise while swinging the plank round: it clears the products standing on the other rows
-const OUT_LOWER = 140;    // driving toward the door the plank comes back down to LIFT (letters on it must pass under the door lintel)
+const PLANK_T = 4;        // plank thickness
+const CLEAR = 6;          // the carried plank's underside passes this far above the other rows' product tops
+const RAISE_T = 0.4;      // s to raise the carriage from LIFT to the travel height
+const FORKS = 84;         // fork length under the plank
+const MARGIN = 10;        // extra reverse past the shelf end before the diagonal
+const DOOR_LEAD = 150;    // the diagonal ends this far inside the door, lined up with it
 const APPROACH_Z = 6;     // carriage height below the plank top when sliding in (fork 1.5 thick, plank 4 thick: the forks just fit under it)
 const REST_Z = 0.3;
-const BACK = 140;
 const BEYOND = 220;
 const CARRIAGE_RATE = 6;  // 1 / s
 const BEEP_T = 0.5;       // real seconds between reversing beeps
 const BLINK_HZ = 4;
 
-type State = 'idle' | 'go' | 'insert' | 'lift' | 'back' | 'out' | 'return' | 'park';
+type State = 'idle' | 'go' | 'insert' | 'lift' | 'raise' | 'back' | 'out' | 'return' | 'park';
 
 const wrap = (a: number): number => a - Math.PI * 2 * Math.round(a / (Math.PI * 2));
 const smooth = (t: number): number => { const k = Math.min(1, Math.max(0, t)); return k * k * (3 - 2 * k); };
@@ -54,7 +57,8 @@ function fork(y: number): THREE.BufferGeometry[] {
 
 /**
  * The dock forklift: parks inside the +x dock door, drives to the oldest shelf row, slides its forks under the plank end,
- * lifts the plank with its products, backs out, carries it out through the dock door, drops (disposes) it and returns.
+ * lifts the plank with its products, raises it over the other rows, reverses out (no turning: forks face -x all trip), backs out
+ * through the dock door, drops (disposes) the load and drives forward back in.
  * World coordinates, `group` under an identity transform. `truck` is the machine: origin = the fork base on the floor, forks point -x.
  * Parts: body (paint-accent) with counterweight (paint) and hazard stripes, fenders, four wheels with painted spokes (front r 7,
  * rear r 6), dash, steering column and wheel, seat on a pedestal, a seated figure, overhead guard (four posts + top frame),
@@ -81,8 +85,9 @@ export class Forklift {
   private roll = 0;          // distance rolled by the wheels (forward positive)
   private st = 0;
   private backX = 0;
-  private ox = 0;           // where the carried plank started swinging toward the door
-  private oy = 0;
+  private endX = 0;          // the fetched plank's +x end
+  private travel = LIFT;     // total carriage rise while carrying: clears the products on the other rows
+  private clearTop = 0;
   private rdt = 0;           // this frame's real dt (beep and blink run in real time)
   private beepT = 0;
   private blinkT = 0;
@@ -191,9 +196,12 @@ export class Forklift {
   /**
    * Fetch one plank. `target()` is the plank's +x end at its top (read every frame until the lift, because planks glide);
    * null = gone, so go home. At lift time `onLift()` hands over the plank and its products; null = abort. Ignored while busy.
+   * `clearTop` = world z of the highest product top on the other rows: the carried plank's underside passes CLEAR above it.
+   * The forklift never turns: the forks (-x) face the shelf the whole trip and it reverses out.
    */
-  fetch(target: () => Vec3 | null, onLift: () => Load | null): void {
+  fetch(target: () => Vec3 | null, onLift: () => Load | null, clearTop = 0): void {
     if (this.state !== 'idle') return;
+    this.clearTop = clearTop;
     this.target = target;
     this.onLift = onLift;
     this.state = 'go';
@@ -238,7 +246,7 @@ export class Forklift {
         const t = this.read();
         if (!t) return this.abort(dt);
         this.czTo = t.z - APPROACH_Z; // forks up to just under the plank while driving over
-        const left = this.drive(t.x + AHEAD, t.y, dt, false, null, 1);
+        const left = this.drive(t.x + AHEAD, t.y, dt, false, 0, 1);
         if (left < 0) return -1;
         this.state = 'insert';
         return left;
@@ -254,6 +262,9 @@ export class Forklift {
         const load = this.onLift!();
         if (!load) return this.abort(left);
         this.load = load;
+        this.endX = t.x;
+        this.travel = Math.max(LIFT, this.clearTop + CLEAR - (t.z - PLANK_T)); // plank underside = t.z - PLANK_T at the lift
+        // the detached load's local matrix is its world matrix (shelf view group, host root and site group are identity)
         this.forks.attach(load.group); // world transform kept: the plank now rides the carriage
         this.state = 'lift';
         this.st = 0;
@@ -264,20 +275,27 @@ export class Forklift {
         this.cz = this.cz0 + LIFT * smooth(this.st / LIFT_T);
         if (this.st < LIFT_T) return -1;
         this.cz = this.czTo = this.cz0 + LIFT;
+        this.state = 'raise';
+        const over = this.st - LIFT_T;
+        this.st = 0;
+        return over;
+      }
+      case 'raise': {
+        this.st += dt;
+        this.cz = this.czTo = this.cz0 + LIFT + (this.travel - LIFT) * smooth(this.st / RAISE_T);
+        if (this.st < RAISE_T) return -1;
+        this.cz = this.czTo = this.cz0 + this.travel;
         this.state = 'back';
-        this.backX = this.x + BACK;
+        this.backX = this.endX + FORKS + MARGIN; // fork base clears the shelf's +x end
         this.beepT = 0;
-        return this.st - LIFT_T;
+        return this.st - RAISE_T;
       }
       case 'back': {
         const left = this.drive(this.backX, this.y, dt, true, 0, 1);
         this.beep();
-        if (this.load) this.cz = this.czTo = this.cz0 + LIFT + (TRAVEL - LIFT) * smooth(1 - (this.backX - this.x) / BACK);
         if (left < 0) return -1;
         this.state = this.load ? 'out' : 'return'; // no load: this was an abort backing out of the row
-        this.st = 0; // out: leg 0 = to the door, 1 = beyond it
-        this.ox = this.x;
-        this.oy = this.y;
+        this.st = 0; // out: leg 0 = diagonal to the door's y, 1 = straight out through it
         this.motor();
         return left;
       }
@@ -285,13 +303,13 @@ export class Forklift {
         const d = this.door;
         let left = dt;
         if (this.st === 0) {
-          left = this.drive(d[0], d[1], left, false, null, 1);
-          const moved = Math.hypot(this.x - this.ox, this.y - this.oy);
-          this.cz = this.czTo = this.cz0 + TRAVEL - (TRAVEL - LIFT) * smooth(left < 0 ? moved / OUT_LOWER : 1);
+          left = this.drive(Math.max(this.x, d[0] - DOOR_LEAD), d[1], left, true, 0, 1);
+          this.beep();
           if (left < 0) return -1;
           this.st = 1;
         }
-        left = this.drive(d[0] + BEYOND, d[1], left, false, null, 1);
+        left = this.drive(d[0] + BEYOND, d[1], left, true, 0, 1);
+        this.beep();
         if (left < 0) return -1;
         this.shed();
         this.czTo = REST_Z;
@@ -301,7 +319,7 @@ export class Forklift {
       }
       case 'return': {
         const p = this.park;
-        const left = this.drive(p[0], p[1], dt, false, null, 1);
+        const left = this.drive(p[0], p[1], dt, false, 0, 1);
         if (left < 0) return -1;
         this.state = 'park';
         return left;

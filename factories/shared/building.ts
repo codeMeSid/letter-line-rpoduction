@@ -165,10 +165,11 @@ export function buildBuilding(looks: Looks, floor: Box2, height: number): Buildi
   // ---- dock door (+x side) ----
   const doorX = x1 - T / 2;
   const doorY = y0 + (DOCK_A + DOCK_B) / 2;
-  place(column(looks, 3, 82, 'steel', 14), doorX, y0 + DOCK_A + 3, 0);
-  place(column(looks, 3, 82, 'steel', 14), doorX, y0 + DOCK_B - 3, 0);
-  group.add(beam(looks, [doorX, y0 + DOCK_A, 80], [doorX, y0 + DOCK_B, 80], 4));
-  place(housing(looks, 8, DOCK_B - DOCK_A + 6, 14, 'paint-accent', 1.5), doorX, doorY, 82); // roll-up shutter box
+  // ponytail: lintel at 110 clears a carried letter (~90 tall); taller future products need a taller door or crates.
+  place(column(looks, 3, 112, 'steel', 14), doorX, y0 + DOCK_A + 3, 0);
+  place(column(looks, 3, 112, 'steel', 14), doorX, y0 + DOCK_B - 3, 0);
+  group.add(beam(looks, [doorX, y0 + DOCK_A, 110], [doorX, y0 + DOCK_B, 110], 4));
+  place(housing(looks, 8, DOCK_B - DOCK_A + 6, 14, 'paint-accent', 1.5), doorX, doorY, 112); // roll-up shutter box
   place(hazardBand(looks, 14, DOCK_B - DOCK_A, 0.6), x1 - 4, doorY, 0); // threshold
   place(box(looks, 70, 120, 2, 'concrete'), x1 + 35, doorY, -2); // apron
   for (const y of [y0 + 32, y0 + 138]) {

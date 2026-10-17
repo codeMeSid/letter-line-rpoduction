@@ -114,6 +114,14 @@ describe('FactorySite', () => {
     expect(t.shipped).toEqual(['a', 'b', 'c']);
     expect(destroyed).toEqual([]);
   });
+  it('fetching the oldest of four rows keeps the forklift (centre + wheel half-width 19) clear of the robot rail', () => {
+    const t = setup();
+    t.type('ab\ncd\nef\ngh');
+    let maxY = -1e9;
+    for (let i = 0; i < 60 * 15; i++) { t.step(1 / 30); maxY = Math.max(maxY, t.site.forklift.truck.position.y); }
+    expect(maxY).toBeGreaterThan(t.host.shelfView.span().y + 90); // it did go to the level-3 row
+    expect(maxY + 19).toBeLessThan(t.host.shelfView.span().y + 150 - 14);
+  });
   it('relayout mid-fetch: the trip still lifts the same row and ships it exactly once', () => {
     const t = setup();
     t.type('ab\ncd\nef\ngh');
