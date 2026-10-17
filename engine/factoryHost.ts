@@ -25,7 +25,7 @@ export interface HostDeps {
   now: () => number;
 }
 
-const FLOOR_PAD = 70;
+export const FLOOR_PAD = 70;
 
 /**
  * Mounts one FactoryDef in 3D at its world origin: floor, conveyors, stations, the Line, product

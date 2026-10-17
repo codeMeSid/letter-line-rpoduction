@@ -21,7 +21,6 @@ export interface Settings {
   defects: boolean;
   defectRate: number;   // 0..0.3
   idleDemo: boolean;
-  forklift: boolean;
   sound: boolean;
   volume: number;       // 0..1
   hudOpen: boolean;
@@ -44,7 +43,6 @@ export const defaultSettings: Settings = {
   defects: true,
   defectRate: 0.06,
   idleDemo: true,
-  forklift: false,
   sound: false,
   volume: 0.6,
   hudOpen: false,

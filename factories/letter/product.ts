@@ -225,5 +225,10 @@ export const letterProduct: ProductModel = {
   stages: LETTER_STAGES,
   size: [Math.ceil(0.7 * LETTER_H + 2 * LETTER_R), 2 * LETTER_R, LETTER_H + 2 * LETTER_R], // y = exact thickness: the shelf stands the back face flush with the plank front
   lineSize: PALLET,
+  shatter: {
+    burst: [{ kind: 'spark', count: 36 }, { kind: 'smoke', count: 6 }],
+    sounds: ['metal-crumple'],
+    fragments: { role: 'steel', count: 9, size: 3.2 },
+  },
   create: (job: Job, ctx: ProductCtx) => new LetterHandle(job, ctx),
 };

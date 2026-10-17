@@ -16,6 +16,10 @@ describe('letterProduct', () => {
   it('stages match the visual table', () => {
     expect(letterProduct.stages).toEqual(LETTER_STAGES);
   });
+  it('declares a metal shatter style', () => {
+    expect(letterProduct.shatter.sounds).toContain('metal-crumple');
+    expect(letterProduct.shatter.fragments.count).toBeGreaterThan(0);
+  });
   it('metal appears during the pour, clipped to the fill level, and ends chrome', () => {
     const looks = new Looks(opts);
     const h = letterProduct.create(job('A'), { looks, marks: defaultSettings.letterMarks });

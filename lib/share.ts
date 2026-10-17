@@ -82,7 +82,6 @@ const validators: Validators = {
   defects: isBool,
   defectRate: inRange(0, 0.3),
   idleDemo: isBool,
-  forklift: isBool,
   sound: isBool,
   volume: inRange(0, 1),
   hudOpen: isBool,

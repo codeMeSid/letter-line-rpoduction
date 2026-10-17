@@ -218,3 +218,19 @@ describe('Shelf', () => {
     expect(s.rows).toHaveLength(1);
   });
 });
+
+describe('readyToShip', () => {
+  const fill = (s: Shelf, n: number) => { for (let i = 0; i < n; i++) s.markFilled(s.reserve('char', 'x').slotId); };
+  it('needs more than SHELF_ROWS rows and a fully filled oldest row', () => {
+    const s = new Shelf();
+    fill(s, 2); s.newline(); fill(s, 1); s.newline(); fill(s, 1);
+    expect(s.readyToShip()).toBe(false);          // 3 rows
+    s.newline();
+    expect(s.readyToShip()).toBe(true);           // 4 rows, row 0 filled
+    s.reserve('char', 'y');
+    expect(s.readyToShip()).toBe(true);           // reserved slot is in the newest row, not row 0
+    const t = new Shelf();
+    t.reserve('char', 'a'); t.newline(); t.newline(); t.newline();
+    expect(t.readyToShip()).toBe(false);          // row 0 still in flight
+  });
+});

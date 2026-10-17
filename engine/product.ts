@@ -1,5 +1,7 @@
 import type * as THREE from 'three';
-import type { Looks } from './looks';
+import type { SoundName } from '../audio/types';
+import type { Looks, MaterialRole } from './looks';
+import type { ParticleKind } from './particles';
 import type { LetterMarks } from './settings';
 import type { Job, ProductKind, Vec3 } from './types';
 
@@ -17,10 +19,19 @@ export interface ProductHandle {
   dispose(): void;
 }
 
+/** How a shot product breaks (spec "Shatter"); also the debris pile in debris mode. */
+export interface ShatterStyle {
+  burst: { kind: ParticleKind; count: number }[];
+  sounds: SoundName[];
+  fragments: { role: MaterialRole; count: number; size: number };
+  puddle?: boolean;
+}
+
 export interface ProductModel {
   kind: ProductKind;
   stages: readonly string[];  // stages[0] = fresh job
   size: Vec3;                 // shelf slot box in the final (placed) pose
   lineSize: number;           // largest horizontal extent while on the line (conveyor spacing)
+  shatter: ShatterStyle;
   create(job: Job, ctx: ProductCtx): ProductHandle;
 }

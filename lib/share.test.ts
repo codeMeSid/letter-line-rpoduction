@@ -12,7 +12,7 @@ describe('share codec', () => {
   });
 
   it('round-trips every product and empty text', () => {
-    for (const product of ['letter', 'bottle', 'can', 'mug', 'cookie', 'neon', 'brick'] as const) {
+    for (const product of ['letter', 'bottle', 'cookie', 'donut', 'mug', 'can', 'car'] as const) {
       expect(decodeShare(encodeShare({ product, text: '', settings: {} }))).toEqual({ product, text: '', settings: {} });
     }
   });
@@ -44,9 +44,9 @@ describe('share codec', () => {
   });
 
   it('omits s when all settings are default and drops product from settings', () => {
-    const qs = encodeShare({ product: 'brick', text: 'a', settings: { ...defaultSettings, product: 'neon' } });
+    const qs = encodeShare({ product: 'car', text: 'a', settings: { ...defaultSettings, product: 'donut' } });
     expect(qs).not.toContain('s=');
-    expect(qs).toContain('p=brick');
+    expect(qs).toContain('p=car');
   });
 
   it('accepts a leading ?', () => {

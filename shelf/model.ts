@@ -17,13 +17,17 @@ export interface NewlineMarker { kind: 'newline' }
  */
 export interface BusyMarker { kind: 'busy' }
 
+export const SHELF_COLS = 14;
+/** Rows the tray keeps; one more makes the forklift fetch the oldest (spec "Forklift"). */
+export const SHELF_ROWS = 3;
+
 /**
  * Typewriter shelf model (pure). Rows of up to `cols` slots; a row either wraps automatically
  * (when the next slot is reserved) or is closed by `newline()` (`endedByNewline`).
  * There is always at least one row.
  */
 export class Shelf {
-  cols = 14;
+  cols = SHELF_COLS;
   rows: Slot[][] = [[]];
   /** endedByNewline[r] is true when row r was closed by newline(). Parallel to `rows`. */
   endedByNewline: boolean[] = [false];
@@ -67,6 +71,11 @@ export class Shelf {
       this.endedByNewline.push(false);
     }
     return first;
+  }
+
+  /** Forklift: more than `keep` rows and the oldest row completely filled (nothing still in flight to it). */
+  readyToShip(keep = SHELF_ROWS): boolean {
+    return this.rows.length > keep && this.rows[0].every((s) => s.state === 'filled');
   }
 
   /**

@@ -114,7 +114,7 @@ describe('Director routing', () => {
     expect(sounds.filter((s) => s === 'ding')).toHaveLength(1);
   });
 
-  it('enter starts a new row; with forklift it ships the closed row', () => {
+  it('enter is a plain newline; shipRow ships the oldest closed row', () => {
     const { d, typeStr } = setup();
     const rows: number[] = [];
     d.events.on('row:new', ({ row }) => rows.push(row));
@@ -123,14 +123,58 @@ describe('Director routing', () => {
     typeStr('c');
     expect(d.shelf('bottle').text()).toBe('ab\nc');
     expect(rows).toEqual([1]);
-
-    const f = setup({ forklift: true });
     const shipped: string[] = [];
-    f.d.events.on('row:shipped', ({ slots }) => shipped.push(slots.map((s) => s.char).join('')));
-    f.typeStr('hi');
-    f.d.handle({ type: 'enter' });
-    expect(shipped).toEqual(['hi']);
-    expect(f.d.shelf('bottle').text()).toBe('');
+    d.events.on('row:shipped', ({ slots }) => shipped.push(slots.map((s) => s.char).join('')));
+    expect(d.shipRow('bottle')?.map((s) => s.char).join('')).toBe('ab');
+    expect(shipped).toEqual(['ab']);
+    expect(d.shelf('bottle').text()).toBe('c');
+  });
+
+  it('only the active factory runs', () => {
+    const { lines, settings, typeStr, run } = setup();
+    typeStr('a');
+    run(0.5);
+    const a = lines.bottle.jobs[0];
+    const snap = () => JSON.stringify([a.phase, a.stationIndex, a.progress, a.pos]);
+    const before = snap();
+    settings.product = 'can';
+    run(2);
+    expect(snap()).toBe(before);
+    settings.product = 'bottle';
+    run(0.3);
+    expect(snap()).not.toBe(before);
+  });
+
+  it('a busy backspace retries after the next slot removal; typing cancels it', () => {
+    const { d, typeStr } = setup();
+    const seen: string[] = [];
+    const dying: number[] = [];
+    d.setBackspaceHandler({
+      handleBackspace(t, { kind }) {
+        seen.push(t.kind);
+        if (t.kind === 'newline') { d.shelf(kind).removeNewline(); return; }
+        d.shelf(kind).markDying(t.id); // like a shot in progress
+        dying.push(t.id);
+      },
+    });
+    const remove = (id: number) => { d.shelf('bottle').remove(id); d.events.emit('slot:removed', { kind: 'bottle', slotId: id }); };
+    typeStr('ab');
+    d.handle({ type: 'enter' });
+    typeStr('c');
+    d.handle({ type: 'backspace' }); // c → dying
+    d.handle({ type: 'backspace' }); // busy: the new row holds only the dying c
+    expect(seen).toEqual(['char']);
+    remove(dying[0]);
+    expect(seen).toEqual(['char', 'newline']);
+    expect(d.shelf('bottle').text()).toBe('ab');
+
+    d.handle({ type: 'enter' });
+    typeStr('x');
+    d.handle({ type: 'backspace' }); // x → dying
+    d.handle({ type: 'backspace' }); // busy
+    typeStr('y');                    // cancels the waiting backspace
+    remove(dying[1]);
+    expect(seen).toEqual(['char', 'newline', 'char']);
   });
 
   it('backspace removes an in-flight job and its slot', () => {
@@ -215,7 +259,7 @@ describe('Director pace', () => {
     expect(b.phase).toBe('shelved');
     expect(settings.pace).toBe('cinematic');
   });
-  it('update applies maxInFlight to every attached line', () => {
+  it('update applies maxInFlight to the active line', () => {
     const s: Settings = { ...defaultSettings, pace: 'cinematic' };
     const d = new Director({ settings: () => s, now: () => 0 });
     const line = new Line([st], [[0, 0, 0]], []);

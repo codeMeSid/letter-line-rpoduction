@@ -3,7 +3,7 @@ import type { Looks } from '../engine/looks';
 import type { ProductHandle } from '../engine/product';
 import type { Job, Vec3 } from '../engine/types';
 import { box, column, housing } from '../factories/shared/parts';
-import type { Shelf } from './model';
+import { SHELF_COLS, type Shelf } from './model';
 
 const MARGIN = 12;   // plank overhang past the first/last slot
 const GAP_X = 8;     // between neighbouring products
@@ -12,6 +12,9 @@ const BASE = 18;     // plank top above the floor (every row)
 const ROW_PITCH = 40; // each older row steps back (+y, toward the robot) on the same level
 /** ponytail: only the newest rows are shown (older handles are hidden, kept); forklift row shipping (later plan) replaces this window. */
 const VISIBLE_ROWS = 3;
+
+/** Plank length for a product slot size (MARGIN both ends + one pitch per column). */
+export const shelfWidth = (size: Vec3, cols = SHELF_COLS): number => MARGIN * 2 + cols * (size[0] + GAP_X);
 
 /**
  * 3D typewriter shelf as a flat tray (R24): the newest row is the front plank, older rows step back at the same
@@ -33,7 +36,7 @@ export class ShelfView {
     this.depth = size[1] + 14;
   }
 
-  get width(): number { return MARGIN * 2 + this.shelf.cols * this.pitch; }
+  get width(): number { return shelfWidth(this.size, this.shelf.cols); }
 
   setOrigin(o: Vec3): void { this.origin = o; this.drawnRows = -1; }
 

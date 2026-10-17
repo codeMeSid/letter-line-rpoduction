@@ -58,8 +58,17 @@ export class Director {
   private placing = new Map<number, Placement>();
   private nextJobId = 1;
   private backspace: BackspaceHandler | null = null;
+  private pending = new Map<ProductKind, number>();
 
-  constructor(private o: DirectorOptions) {}
+  constructor(private o: DirectorOptions) {
+    // a backspace that met a busy row waits for the next removal (shelf/model.ts peekLast ruling)
+    this.events.on('slot:removed', ({ kind }) => {
+      const n = this.pending.get(kind) ?? 0;
+      if (n <= 0) return;
+      this.pending.set(kind, n - 1);
+      this.backspaceCmd(kind);
+    });
+  }
 
   /** Register a factory's line; returns a detach function. */
   attach(kind: ProductKind, host: LineHost): () => void {
@@ -95,6 +104,7 @@ export class Director {
 
   handle(cmd: Command): void {
     const kind = this.o.settings().product;
+    if (cmd.type !== 'backspace') this.pending.delete(kind); // typing cancels waiting backspaces
     switch (cmd.type) {
       case 'char':
       case 'space':
@@ -109,15 +119,17 @@ export class Director {
     }
   }
 
-  /** Advance every line and the placement arcs. Returns true while anything is in flight. */
+  /** Advance the active factory only (others are paused); returns true while it has anything in flight. */
   update(simDt: number): boolean {
-    // a job arcing to the shelf is still in flight (cinematic shows one product all the way to the shelf)
-    const maxInFlight = paceParams(this.o.settings().pace).maxInFlight;
-    for (const [kind, h] of this.hosts) {
-      h.line.maxInFlight = maxInFlight - [...this.placing.values()].filter((p) => p.kind === kind).length;
+    const kind = this.o.settings().product;
+    const host = this.hosts.get(kind);
+    const mine = () => [...this.placing.values()].filter((p) => p.kind === kind);
+    if (host) {
+      // a job arcing to the shelf is still in flight (cinematic shows one product all the way to the shelf)
+      host.line.maxInFlight = paceParams(this.o.settings().pace).maxInFlight - mine().length;
+      host.line.tick(simDt);
     }
-    for (const h of this.hosts.values()) h.line.tick(simDt);
-    for (const p of [...this.placing.values()]) {
+    for (const p of mine()) {
       p.t = Math.min(1, p.t + simDt / PLACE_TIME);
       const to = this.hosts.get(p.kind)?.slotPos(p.job.slotId) ?? null;
       if (!to) { this.drop(p.job); continue; } // slot gone (shipped/removed)
@@ -130,8 +142,14 @@ export class Director {
       ];
       if (p.t >= 1) { p.job.pos = [...to]; this.shelve(p); }
     }
-    for (const h of this.hosts.values()) if (h.line.jobs.length) return true;
-    return this.placing.size > 0;
+    return (host?.line.jobs.length ?? 0) > 0 || mine().length > 0;
+  }
+
+  /** Forklift lift: remove the oldest row from the model and announce it (fx/site.ts calls this). */
+  shipRow(kind: ProductKind): Slot[] | null {
+    const slots = this.shelf(kind).shipRow();
+    if (slots) this.events.emit('row:shipped', { kind, slots });
+    return slots;
   }
 
   /** Remove an in-flight job (line or placement) and mark it destroyed. Returns it, or null. */
@@ -178,16 +196,13 @@ export class Director {
     const shelf = this.shelf(kind);
     shelf.newline();
     this.events.emit('row:new', { kind, row: shelf.rows.length - 1 });
-    if (!this.o.settings().forklift) return;
-    // ponytail: ships the oldest closed row; forklift visuals and in-flight jobs bound for it are Task 10
-    const slots = shelf.shipRow();
-    if (slots) this.events.emit('row:shipped', { kind, slots });
   }
 
   private backspaceCmd(kind: ProductKind): void {
     const shelf = this.shelf(kind);
     const target = shelf.peekLast();
-    if (!target || target.kind === 'busy') return; // busy: Task 8 retries after the next removal
+    if (!target) return;
+    if (target.kind === 'busy') { this.pending.set(kind, (this.pending.get(kind) ?? 0) + 1); return; }
     if (this.backspace) {
       this.backspace.handleBackspace(target, { kind, director: this });
       return;

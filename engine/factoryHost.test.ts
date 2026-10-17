@@ -26,6 +26,7 @@ function setup(look: LookOptions['look'] = 'realistic') {
   const insts: RecInst[] = [];
   const product: ProductModel = {
     kind: 'letter', stages: ['raw', 'a', 'b'], size: [26, 8, 32], lineSize: 46,
+    shatter: { burst: [], sounds: [], fragments: { role: 'steel', count: 0, size: 1 } },
     create: () => {
       const h: RecHandle = {
         root: new THREE.Group(), shapes: [], calls: [], disposed: false, restyled: 0,

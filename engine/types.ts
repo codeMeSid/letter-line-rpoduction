@@ -1,5 +1,5 @@
 export type Vec3 = [number, number, number];
-export type ProductKind = 'letter' | 'bottle' | 'can' | 'mug' | 'cookie' | 'neon' | 'brick';
+export type ProductKind = 'letter' | 'bottle' | 'cookie' | 'donut' | 'mug' | 'can' | 'car';
 export type Look = 'realistic' | 'lineart' | 'flat' | 'cutaway';
 export type Pace = 'auto' | 'fast' | 'detailed' | 'cinematic';
 export type Quality = 'low' | 'high';
@@ -32,6 +32,8 @@ export type Command =
   | { type: 'backspace' }
   | { type: 'enter' };
 
-export const PRODUCT_KINDS: readonly ProductKind[] = ['letter', 'bottle', 'can', 'mug', 'cookie', 'neon', 'brick'];
+/** Campus order = build order (spec "Product kinds"). */
+export const PRODUCT_KINDS: readonly ProductKind[] = ['letter', 'bottle', 'cookie', 'donut', 'mug', 'can', 'car'];
+export const LAYOUT_MODES: readonly LayoutMode[] = ['snake', 'pan', 'stacked', 'all'];
 export const LOOKS: readonly Look[] = ['realistic', 'lineart', 'flat', 'cutaway'];
 export const PACES: readonly Pace[] = ['auto', 'fast', 'detailed', 'cinematic'];
