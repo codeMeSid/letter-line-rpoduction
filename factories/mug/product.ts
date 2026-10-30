@@ -142,7 +142,6 @@ class MugHandle implements ProductHandle {
     c.body.scale.set(1, 1, Math.max(1e-3, v.body));
     c.handle.visible = v.handle > 0.01;
     c.handle.position.x = (1 - v.handle) * 12;
-    c.handle.scale.setScalar(Math.max(1e-3, v.handle));
     c.ink.visible = v.print > 0.5;
     c.ink.scale.setScalar(Math.max(1e-3, v.print));
 
