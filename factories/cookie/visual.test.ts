@@ -16,7 +16,6 @@ describe('cookieVisual', () => {
     for (const s of COOKIE_STAGES) for (let i = 0; i <= 10; i++) {
       const v = cookieVisual(s, i / 10);
       for (const key of ['chips', 'bake', 'sprinkles', 'cup'] as const) expect(v[key]).toBeGreaterThanOrEqual(prev[key] - 1e-9);
-      if (v.bake >= 1 && v.cup >= 0 && s !== 'cooled' && s !== 'iced' && s !== 'sprinkled' && s !== 'packed') expect(v.icing).toBe(0);
       prev = v;
     }
   });

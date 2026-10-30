@@ -29,7 +29,6 @@ describe('mugProduct', () => {
 
   it('shows the tub first, casts the wall, presses the handle on', () => {
     const h = make();
-    expect(obj(h, 'tub') ?? true).toBeTruthy();
     expect(obj(h, 'mug').visible).toBe(false);
     h.shape('clay', 1);
     expect(obj(h, 'fill').visible).toBe(true);

@@ -4,11 +4,19 @@ import { layoutStations } from '../engine/layout';
 import { LAYOUT_MODES, PRODUCT_KINDS, type ProductKind, type Vec3 } from '../engine/types';
 import { shelfWidth } from '../shelf/view';
 import { bottleFactory } from './bottle';
+import { canFactory } from './can';
+import { carFactory } from './car';
+import { cookieFactory } from './cookie';
+import { donutFactory } from './donut';
 import { letterFactory } from './letter';
+import { mugFactory } from './mug';
 import { BELT_TOP } from './shared/dims';
 
 /** ProductKind → FactoryDef (built factories only; the rest are construction sites). */
-export const FACTORIES: Partial<Record<ProductKind, FactoryDef>> = { letter: letterFactory, bottle: bottleFactory };
+export const FACTORIES: Partial<Record<ProductKind, FactoryDef>> = {
+  letter: letterFactory, bottle: bottleFactory, cookie: cookieFactory, donut: donutFactory,
+  mug: mugFactory, can: canFactory, car: carFactory,
+};
 
 /** Plot width: the widest the factory gets in any layout mode (or its shelf), plus the left pad and the dock pad. */
 export function plotWidth(def: FactoryDef): number {

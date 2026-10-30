@@ -30,6 +30,7 @@ its Tasks 5–13 are superseded. Controller-owned file (implementers do not edit
 | 18 | Workers, day/night, HUD toggles, docs | complete | 700a9bd..66e929d |
 | Final | Whole-branch review (Tasks 13–18) | complete (1 fix pass) | 66e929d..3b98fe2 |
 | 19 | Glass bottle factory (product, 13 stations, shared stationKit/railRobot, registry) | complete (Opus review APPROVE, 2 nits fixed; flat iso + cutaway visual check, realistic look not checked; no bench views) | uncommitted |
+| 20–24 | Cookie (11), donut (11), mug (11), can (12), toy car (12) factories + registry wiring | built, unreviewed; gates green (typecheck, 961 tests, build); NOT visually checked, no Opus review; cookie/donut/car glyph ignores letterMarks; can robot grip heights 25/25 guessed |
 
 Campus plan (Tasks 13–18): `docs/superpowers/plans/2026-10-17-campus-foundation.md`, spec
 `docs/superpowers/specs/2026-10-17-campus-foundation-design.md`, ledger `.superpowers/sdd/2026-10-17-campus-foundation/progress.md`.
