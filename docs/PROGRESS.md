@@ -29,6 +29,7 @@ its Tasks 5–13 are superseded. Controller-owned file (implementers do not edit
 | 17 | Forklift row shipping, per-row planks, figure | complete (1 fix round) | 37f20ed..700a9bd |
 | 18 | Workers, day/night, HUD toggles, docs | complete | 700a9bd..66e929d |
 | Final | Whole-branch review (Tasks 13–18) | complete (1 fix pass) | 66e929d..3b98fe2 |
+| 19 | Glass bottle factory (product, 13 stations, shared stationKit/railRobot, registry) | complete (Opus review APPROVE, 2 nits fixed; flat iso + cutaway visual check, realistic look not checked; no bench views) | uncommitted |
 
 Campus plan (Tasks 13–18): `docs/superpowers/plans/2026-10-17-campus-foundation.md`, spec
 `docs/superpowers/specs/2026-10-17-campus-foundation-design.md`, ledger `.superpowers/sdd/2026-10-17-campus-foundation/progress.md`.

@@ -8,7 +8,7 @@ A full-page Next.js app: every typed character runs an animated 3D factory (Thre
 realistic, line-art, flat iso, cutaway) whose real procedural machines visibly turn raw material into
 a product that is or bears that character, then shelve it like a typewriter. Space = empty slot, Backspace = remove the
 last slot (landed: shotgun for shelved products, reject hoist and chute, shelf broom), Enter = new row (landed: the dock forklift ships the
-oldest row once more than three are shelved). Product factories: cast metal letter landed; glass bottle, cookie, donut, mug, can, toy car are construction-site plots (later plans).
+oldest row once more than three are shelved). Product factories: cast metal letter and glass bottle landed; cookie, donut, mug, can, toy car are construction-site plots (later plans).
 They stand on a campus (picker to fly between factories, construction sites for later ones); each built factory sits in a building with workers
 patrolling it and an optional day/night cycle. Procedural sound (default off), collapsible HUD.
 **User bar:** real machinery, the product visibly taking shape — never placeholder boxes.
@@ -106,6 +106,8 @@ uses relative imports (vitest has no alias).
   `Director`: a *pending* backspace waits for a busy newline row and typing cancels it; only the active product's factory advances (others freeze, resume); `shipRow(kind)` removes the oldest row once the forklift lifts it.
   `Shelf.readyToShip()` (more than `SHELF_ROWS` = 3 rows), `shipRow()`.
 - `shelf/view.ts` also: per-row plank groups (`ROW_PITCH` 32, levels 0..3, deeper rows stack in tiers of 40 above level 3 so they never reach the robot rail), `releaseRow(row)` (forklift takes the plank + products), `release(slotId)` (shotgun takes one product), `rowEnd(row)`, `productHeight`.
+- `factories/bottle/`: `visual.ts` (pure, `BOTTLE_STAGES` = tub, batch, mixed, melted, gob, parison, bottle-hot, bottle, filled, capped, labelled) + `product.ts` (`bottleProduct`: lathe bottle with gob/parison morph targets on the finished-bottle base, batch tub with granule layers, liquid + foam, crown, partial-cylinder label with bent `letterGeometry` glyph, emboss; `PUCK_T`) + `stations/` one file each: `silos`, `mixer`, `furnace`, `gobShear`, `isMachine`, `lehr`, `inspection` (rejects only on `job.defect`), `rinser`, `filler`, `capper`, `labeler`, `coder`, `robot`. No bench views yet.
+- `factories/shared/stationKit.ts` (was `letter/stations/common.ts`, which now re-exports it) + `shared/railRobot.ts` (`railRobot(id, beltTip, shelfTip)`: rail robot placing onto the shelf; both factories' `robot` wrap it).
 - `factories/registry.ts` — `FACTORIES`, `factoryOrigin`, `PLOTS` (campus plots; unbuilt kinds are construction sites).
 - `factories/shared/building.ts` (`buildBuilding(looks, floorBox, height)`: shell, sloped side walls, +x dock door with 110 lintel, chute/bin anchors, `setNight` windows and lamps, sign anchor) + `factories/shared/figure.ts` (`figure(looks)` low-poly worker: `pose(walk, arm, seated?)`).
 - `fx/` — `ground` (campus ground), `construction` (`ConstructionSite`, `setNight`), `site` (`FactorySite`: building + sign + hoist, broom, forklift, workers per built factory; created once, `rebuild()` after relayout, `update(realDt, night)`),
