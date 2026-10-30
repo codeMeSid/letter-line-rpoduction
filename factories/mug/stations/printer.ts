@@ -3,10 +3,11 @@ import type { StationDef } from '../../../engine/station';
 import { beam, column, housing, lathe } from '../../shared/parts';
 import { FLOOR, oneShots, ss, stationBase, teardown } from '../../shared/stationKit';
 import { controls } from './kit';
+import { PUCK_T } from '../product';
 
 const PAD_OUT = -62;   // pad face when retracted
 const PAD_HIT = -14;   // pad face on the mug's front (radius 12) and on the cliche plate
-const PAD_Z = 13;
+const PAD_Z = 13 + PUCK_T;
 const PLATE_X = -50;
 
 /**

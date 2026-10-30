@@ -4,6 +4,7 @@ import { beam, box, column, housing } from '../../shared/parts';
 import { FLOOR, oneShots, ss, stationBase, teardown, world } from '../../shared/stationKit';
 import { mugVisual } from '../visual';
 import { controls } from './kit';
+import { HANDLE_Z, PUCK_T } from '../product';
 
 const TIP0 = 19.5 + 12;   // pusher face when the handle has not moved in yet (handle outer edge + slide)
 
@@ -34,8 +35,8 @@ export const handler: StationDef = {
     for (const y of [-7, 7]) {
       const pad = column(looks, 3, 6, 'rubber', 12);
       pad.rotation.y = -Math.PI / 2;
-      pad.position.set(-13, y, 12.5);
-      group.add(pad, beam(looks, [-16, y, 12.5], [-48, y, 12.5], 3.5, 'steel'));
+      pad.position.set(-13, y, (HANDLE_Z + PUCK_T));
+      group.add(pad, beam(looks, [-16, y, (HANDLE_Z + PUCK_T)], [-48, y, (HANDLE_Z + PUCK_T)], 3.5, 'steel'));
     }
     group.add(housing(looks, 8, 22, 18, 'paint', 2).translateX(-52).translateZ(3));
     // Magazine: rack with a stack of handles waiting, chute to the pusher.
@@ -58,8 +59,8 @@ export const handler: StationDef = {
         const tt = ss(0, 1, t);
         const pushing = live ? mugVisual('handled', tt).handle : 0;
         const tip = live ? TIP0 - 12 * pushing : TIP0 + 14;
-        shoe.position.set(tip + 1.5, 0, 12.5);
-        rod.position.set(tip + 3, 0, 12.5);
+        shoe.position.set(tip + 1.5, 0, (HANDLE_Z + PUCK_T));
+        rod.position.set(tip + 3, 0, (HANDLE_Z + PUCK_T));
         if (live && t >= 0.55 && shots.once('press')) {
           ctx.audio.play('press-thump', { x: ctx.origin[0] });
           ctx.particles.emit('crumb', { pos: world(ctx, 14, 0, 14), count: 4, vel: [6, 0, 8], spread: 4, floor: world(ctx, 0, 0, 0)[2] });

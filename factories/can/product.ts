@@ -125,6 +125,7 @@ class CanHandle implements ProductHandle {
     strapB.position.z = 4;
     coil.add(strapB);
     const strip = box(looks, 30, 26, 0.7, 'steel');
+    own.push(strip.geometry);
     const liquid = looks.part(g.liquid, 'liquid', false);
     liquid.position.z = LIQ_Z0;
     const foam = new THREE.Mesh(g.liquid, foamMat);
@@ -138,6 +139,7 @@ class CanHandle implements ProductHandle {
     const lid = new THREE.Group();
     lid.add(looks.part(g.lid, 'steel'));
     const tab = box(looks, 5, 7, 0.6, 'paint-accent');
+    own.push(tab.geometry);
     tab.position.set(0, -1, 1.2);
     lid.add(tab);
     if (marks.cap) {

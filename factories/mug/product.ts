@@ -15,7 +15,7 @@ const TUB_R = 15;
 const FILL_Z0 = 1.8;
 const FILL_H = 12;
 const HANDLE_R = 6;
-const HANDLE_Z = 12.5;
+export const HANDLE_Z = 12.5;
 const SEG = 32;
 
 const DRY = new THREE.Color(0xd8cdb8);
@@ -142,7 +142,7 @@ class MugHandle implements ProductHandle {
     c.body.scale.set(1, 1, Math.max(1e-3, v.body));
     c.handle.visible = v.handle > 0.01;
     c.handle.position.x = (1 - v.handle) * 12;
-    c.ink.visible = v.print > 0.5;
+    c.ink.visible = v.print > 0.01;
     c.ink.scale.setScalar(Math.max(1e-3, v.print));
 
     tmp.copy(DRY).lerp(WET, v.wet).lerp(BISCUIT, v.fire).lerp(GLAZE, v.glaze);

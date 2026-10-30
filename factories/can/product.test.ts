@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Looks } from '../../engine/looks';
 import { defaultSettings } from '../../engine/settings';
 import type { Job } from '../../engine/types';
@@ -62,7 +62,12 @@ describe('canProduct', () => {
     parent.add(h.root);
     h.shape('washed', 0.5);
     h.restyle();
+    const own = (h as unknown as { c: { own: THREE.BufferGeometry[]; strip: THREE.Mesh; lid: THREE.Group } }).c;
+    const geoms = [...own.own, own.strip.geometry];
+    const spies = geoms.map((g) => vi.spyOn(g, 'dispose'));
     h.dispose();
     expect(parent.children).toHaveLength(0);
+    expect(spies.length).toBeGreaterThan(2);
+    for (const s of spies) expect(s).toHaveBeenCalled();
   });
 });

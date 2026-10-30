@@ -24,7 +24,6 @@ export const tester: StationDef = {
     group.add(beam(looks, [0, -38, GANTRY_Z], [0, 38, GANTRY_Z], 7, 'paint'));
     // Vision head over the open end with a ring light.
     const head = new THREE.Group();
-    head.position.set(0, 0, GANTRY_Z - 4);
     head.add(housing(looks, 14, 14, 16, 'rubber', 1.5), lathe(looks, [[0, 0], [4.4, 0], [4.4, -6], [3, -8], [0, -8]], 'glass', 16));
     group.add(head, beam(looks, [0, 0, GANTRY_Z - 4], [0, 0, GANTRY_Z - 8], 3, 'steel'));
     head.position.z = GANTRY_Z - 24;

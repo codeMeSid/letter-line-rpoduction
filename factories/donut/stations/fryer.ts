@@ -25,10 +25,7 @@ export const fryer: StationDef = {
     // Round open pot: the tray (r 22) is lowered inside it.
     const vat = lathe(looks, [[0, 0], [27, 0], [27, OIL_Z + 2 - FLOOR], [25.5, OIL_Z + 2 - FLOOR], [25.5, 22], [0, 22]], 'paint');
     vat.position.set(0, VAT_Y, FLOOR);
-    let oil = looks.own('liquid');
-    const appearance = () => looks.appearance(oil, { color: new THREE.Color(0xc78a22), emissive: new THREE.Color(0x000000), emissiveIntensity: 0, metalness: 0.1, roughness: 0.1 });
-    appearance();
-    const surface = new THREE.Mesh(new THREE.CylinderGeometry(25.5, 25.5, 0.4, 32).rotateX(Math.PI / 2), oil);
+    const surface = looks.part(new THREE.CylinderGeometry(25.5, 25.5, 0.4, 32).rotateX(Math.PI / 2), 'liquid', false);
     surface.position.set(0, VAT_Y, OIL_Z + 1.6);
     group.add(vat, surface);
     for (const s of [-1, 1]) group.add(pipe(looks, [[s * 28, VAT_Y - 10, FLOOR + 14], [s * 38, VAT_Y - 10, FLOOR + 14], [s * 38, VAT_Y + 10, FLOOR + 14], [s * 28, VAT_Y + 10, FLOOR + 14]], 2, 'copper'));
@@ -77,8 +74,7 @@ export const fryer: StationDef = {
         if (live !== on) { on = live; beacon.set(live); }
       },
       finish: () => 'pass',
-      restyle() { oil.dispose(); oil = looks.own('liquid'); surface.material = oil; appearance(); },
-      destroy() { teardown(group); oil.dispose(); },
+            destroy() { teardown(group); },
     };
   },
 };

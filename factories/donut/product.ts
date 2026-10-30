@@ -14,6 +14,15 @@ export const DON_TOP = DON_Z + DON_r + 1; // glaze top while lying on the tray
 const GLAZE_R = DON_r + 0.6;
 const RADIAL = 14;
 const TUBULAR = 48;
+
+/** TorusGeometry indexes radial-outer; reorder quads tubular-outer so setDrawRange draws a growing arc. */
+function tubularOrder(geom: THREE.BufferGeometry): void {
+  const old = geom.index!.array, out = new Uint32Array(old.length);
+  let n = 0;
+  for (let i = 0; i < TUBULAR; i++) for (let j = 0; j < RADIAL; j++) for (let k = 0; k < 6; k++) out[n++] = old[(j * TUBULAR + i) * 6 + k];
+  geom.setIndex(new THREE.BufferAttribute(out, 1));
+}
+
 const BOWL_Z = TRAY_T;
 const SPRINKLES = 36;
 
@@ -95,7 +104,9 @@ class DonutHandle implements ProductHandle {
     this.bowlGroup.add(bowl, fill);
 
     const ringGeom = g.ring.clone();
+    tubularOrder(ringGeom);
     const glazeGeom = g.glaze.clone();
+    tubularOrder(glazeGeom);
     own.push(ringGeom, glazeGeom);
     const ring = new THREE.Mesh(ringGeom, ringMat);
     ring.castShadow = true;

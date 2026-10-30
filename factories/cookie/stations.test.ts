@@ -47,7 +47,7 @@ describe.each(STATIONS)('%s', (def, out, shaped, sounds) => {
     expect(r.verdict).toBe('pass');
   });
   it('space jobs make no sound and no particles', () => {
-    const r = runJob(def, job('', true));
+    const r = runJob(def, job(' ', true));
     expect(r.k.plays).toEqual([]);
     expect(r.k.particles.count).toBe(0);
   });

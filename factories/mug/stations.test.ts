@@ -74,6 +74,7 @@ describe.each(STATIONS)('%s', (def, out, shaped, sounds, emits) => {
     const inst = def.create(k.ctx);
     expect(k.group.children.length).toBeGreaterThan(0);
     for (let i = 0; i < 10; i++) inst.update(1 / 30, null, 0, null);
+    expect(k.particles.count).toBe(0);
     inst.destroy();
     expect(k.group.children.length).toBe(0);
     expect(k.loops.every((l) => l.stopped)).toBe(true);

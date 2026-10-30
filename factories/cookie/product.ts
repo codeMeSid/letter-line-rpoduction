@@ -9,7 +9,6 @@ export const BED_R = 17;   // baking disc under the cookie
 export const BED_T = 2;
 export const CUP_H = 5.8;
 export const CUP_LIFT = 0.6;
-export const COOKIE_H = 12; // tallest the cookie gets on the line (dough column)
 const SEG = 32;
 
 const DOUGH = new THREE.Color(0xe4c58a);

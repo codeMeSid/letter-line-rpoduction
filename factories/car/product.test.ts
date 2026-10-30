@@ -32,6 +32,14 @@ describe('carProduct', () => {
     expect(h.root.getObjectByName('car')!.visible).toBe(true);
     h.dispose();
   });
+  it('glyph stays visible when boxed', () => {
+    const h = make('A');
+    h.shape('boxed', 1);
+    let seen = false;
+    h.root.traverse((o) => { if (o.visible && (o as THREE.Mesh).geometry && o.parent?.visible) seen ||= o.position.y === -7.6; });
+    expect(seen).toBe(true);
+    h.dispose();
+  });
   it('place hides the tray; restyle keeps the shape', () => {
     const h = make('Z');
     h.shape('boxed', 1);

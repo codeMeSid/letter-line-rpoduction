@@ -8,12 +8,12 @@ import { CAR_STAGES, carVisual } from './visual';
 
 export { CAR_STAGES };
 export const TRAY_T = 3;       // pallet thickness under the car
-export const CAR_H = 18;       // carton top over the product root on the shelf
+const BOX_Z = 17 - TRAY_T;     // carton height above the tray
+export const CAR_H = TRAY_T + BOX_Z; // carton top over the product root on the shelf
 const CAR_Z = 2.2;             // body floor above the tray top (wheel clearance)
 const AXLE_Z = 3.2;
 const WHEEL_X = 10;
 const WHEEL_Y = 9.2;
-const BOX_Z = 17 - TRAY_T;     // carton height above the tray
 
 const HOT = new THREE.Color(0xff5a10);
 const COLD = new THREE.Color(0xe9e6dc);
@@ -57,7 +57,7 @@ function geoms(): Shared {
   const glass = mergeGeometries([rb(11, 11.2, 3.2, -2, CAR_Z + 5.6, 0.8), rb(0.6, 12.4, 2.6, 4.6, CAR_Z + 5.7, 0.2)])!;
   const tray = new RoundedBoxGeometry(40, 24, TRAY_T, 2, 1).translate(0, 0, TRAY_T / 2);
   const wall = (w: number, d: number, x: number, y: number) => new THREE.BoxGeometry(w, d, BOX_Z).translate(x, y, BOX_Z / 2);
-  const trayBox = mergeGeometries([new THREE.BoxGeometry(38, 22, 0.8).translate(0, 0, 0.4), wall(38, 0.8, 0, -10.6), wall(38, 0.8, 0, 10.6), wall(0.8, 22, -18.6, 0), wall(0.8, 22, 18.6, 0)])!;
+  const trayBox = mergeGeometries([new THREE.BoxGeometry(38, 22, 0.8).translate(0, 0, 0.4), new THREE.BoxGeometry(38, 0.8, 3).translate(0, -10.6, 1.5), wall(38, 0.8, 0, 10.6), wall(0.8, 22, -18.6, 0), wall(0.8, 22, 18.6, 0)])!;
   const lid = new THREE.BoxGeometry(37, 21, 0.5).translate(0, 0, BOX_Z - 0.25);
   shared = { body, sprue, pellets, puddle, axle, tyres, hubs, glass, tray, trayBox, lid };
   return shared;

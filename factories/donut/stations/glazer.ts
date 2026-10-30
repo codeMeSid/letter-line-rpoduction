@@ -32,10 +32,7 @@ export const glazer: StationDef = {
     group.add(pipe(looks, [[-4, 48, FLOOR + 56], [-4, 40, HEAD_Z + 14], [0, 24, HEAD_Z + 4]], 2.4, 'steel'));
     group.add(pipe(looks, [[26, 48, FLOOR + 14], [26, 38, FLOOR + 20], [20, 24, HEAD_Z - 2], [DON_R, 4, HEAD_Z + 2]], 2, 'copper'));
     // Glaze curtain: thin sheet from the slot to the ring top.
-    let glazeMat = looks.own('liquid');
-    const colour = () => looks.appearance(glazeMat, { color: new THREE.Color(0xe98fb0), emissive: new THREE.Color(0x000000), emissiveIntensity: 0, metalness: 0, roughness: 0.1 });
-    colour();
-    const curtain = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), glazeMat);
+    const curtain = looks.part(new THREE.BoxGeometry(1, 1, 1), 'liquid', false);
     curtain.visible = false;
     group.add(curtain);
     const dial = gauge(looks, 5);
@@ -66,8 +63,7 @@ export const glazer: StationDef = {
         if (live !== on) { on = live; beacon.set(live); }
       },
       finish: () => 'pass',
-      restyle() { glazeMat.dispose(); glazeMat = looks.own('liquid'); curtain.material = glazeMat; colour(); },
-      destroy() { teardown(group); glazeMat.dispose(); },
+      destroy() { teardown(group); },
     };
   },
 };

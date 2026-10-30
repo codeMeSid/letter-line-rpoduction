@@ -44,8 +44,7 @@ export const extruder: StationDef = {
     for (const y of [-30, 30]) group.add(beam(looks, [FUNNEL_X, y, FLOOR], [FUNNEL_X, y, RAM_TOP + 40], 5, 'paint'));
     group.add(beam(looks, [FUNNEL_X, -30, RAM_TOP + 40], [FUNNEL_X, 30, RAM_TOP + 40], 6, 'paint'));
     // Dough strand between the nozzle and the dough on the tray.
-    const strand = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 1, 12).rotateX(Math.PI / 2), looks.material('sand'));
-    strand.userData.role = 'sand';
+    const strand = looks.part(new THREE.CylinderGeometry(3.4, 3.4, 1, 12).rotateX(Math.PI / 2), 'sand');
     strand.visible = false;
     const dial = gauge(looks, 5);
     dial.group.position.set(30, 30, 50);
